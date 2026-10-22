@@ -1,0 +1,31 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+keystore.properties
+keystore/*.jks
+keystore/*.keystore
+dist/
+.kotlin/
+
+# 本地测试与截图产物，不进入仓库
+/*.png
+/*.pdf
+/*.xml
+/*.apk
+/*.mtrbackup
+/*.csv
+
+# 宣传素材工作目录（含 node_modules 与草稿）
+promo/
+
+# Python 测试数据生成器缓存
+__pycache__/
+*.pyc

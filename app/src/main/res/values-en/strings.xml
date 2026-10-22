@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MindTrace</string>
+    <string name="notification_channel_reminders">Check-in reminders</string>
+    <string name="notification_channel_reminders_desc">Daily check-in and medication reminders; can be turned off in Settings</string>
+    <string name="notification_channel_safety">Safety reminders</string>
+    <string name="notification_channel_safety_desc">Safety plan and visit-related reminders</string>
+</resources>

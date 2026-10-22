@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 一片安静的叶子与一道水波，代表被看见的起伏 -->
+    <path
+        android:fillColor="#6F8A7A"
+        android:pathData="M54,27 C67,37 75,48 75,60 C75,72 66,81 54,81 C42,81 33,72 33,60 C33,48 41,37 54,27 Z" />
+    <path
+        android:fillColor="#EFE8DC"
+        android:pathData="M54,38 C61,45 65,51 65,59 C65,67 60,72 54,72 C48,72 43,67 43,59 C43,51 47,45 54,38 Z" />
+    <path
+        android:fillColor="#A7805C"
+        android:pathData="M54,52 C58,55 60,59 60,63 C60,67 57,70 54,70 C51,70 48,67 48,63 C48,59 50,55 54,52 Z" />
+</vector>

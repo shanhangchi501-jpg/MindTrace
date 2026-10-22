@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">心迹</string>
+    <string name="notification_channel_reminders">记录提醒</string>
+    <string name="notification_channel_reminders_desc">每日记录与服药提醒，可在设置中关闭</string>
+    <string name="notification_channel_safety">安全相关提醒</string>
+    <string name="notification_channel_safety_desc">安全计划与复诊相关提醒</string>
+</resources>
