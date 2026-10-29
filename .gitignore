@@ -29,3 +29,8 @@ promo/
 # Python 测试数据生成器缓存
 __pycache__/
 *.pyc
+
+# 本地内部文档，不进入公开仓库
+internal/
+cover/
+xhs/

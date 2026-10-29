@@ -127,8 +127,6 @@ app/src/main/java/com/mindtrace/app/
 
 - [USER_GUIDE.md](USER_GUIDE.md)：安装、使用、备份、提醒排查与常见问题
 - [PRIVACY.md](PRIVACY.md)：权限、数据范围与隐私说明
-- [PROMOTION.md](PROMOTION.md)：B 站 / 小红书发布文案与发布红线
-- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)：公开发布前的完整检查清单
 - [TESTING.md](TESTING.md)：功能测试清单
 - [CHANGELOG.md](CHANGELOG.md)：版本变更
 
