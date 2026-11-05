@@ -10,6 +10,8 @@ import com.mindtrace.app.MindTraceApp
 import com.mindtrace.app.data.AdherenceSummary
 import com.mindtrace.app.data.AppLanguage
 import com.mindtrace.app.data.BackupManager
+import com.mindtrace.app.data.CloudBackupClient
+import com.mindtrace.app.data.CloudConfig
 import com.mindtrace.app.data.CheckInEntity
 import com.mindtrace.app.data.CrisisContactEntity
 import com.mindtrace.app.data.DateUtils
@@ -38,6 +40,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -82,6 +86,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val today: StateFlow<String> = MutableStateFlow(DateUtils.todayIso()).asStateFlow()
 
     val todayLogs = today.flatMapLatest { date ->
+        container.medicationRepository.observeLogsForDate(date)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 补记页当前选中的日期；切换日期时自动重新读取这一天的服药记录。 */
+    val backfillDate = MutableStateFlow(DateUtils.todayIso())
+    val backfillLogs = backfillDate.flatMapLatest { date ->
         container.medicationRepository.observeLogsForDate(date)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -264,6 +274,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setBackfillDate(date: String) {
+        backfillDate.value = date
+    }
+
+    /** 补记 / 修正历史服药数据：直接修改该日期的记录，不新增数据段、不做补记标记。 */
+    fun setDoseRecord(medicationId: Long, date: String, time: String, taken: Boolean, takenAt: Long) {
+        viewModelScope.launch {
+            container.medicationRepository.setDoseRecord(medicationId, date, time, taken, takenAt)
+        }
+    }
+
     suspend fun dosesFor(date: String): List<DoseSlot> {
         val meds = container.medicationRepository.getActive()
         val logs = container.medicationRepository.getAllLogs().filter { it.date == date }
@@ -405,6 +426,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         return result
     }
+
+    /** 云备份：把本机数据导出成加密 .mtrbackup 后上传，备份密码不保存。 */
+    suspend fun uploadCloudBackup(config: CloudConfig, password: CharArray): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val buffer = ByteArrayOutputStream()
+                BackupManager.writeEncrypted(container, buffer, password)
+                CloudBackupClient.upload(config, buffer.toByteArray()).getOrThrow()
+            }
+        }
+
+    /** 云备份：下载加密备份并恢复，复用本地「从备份恢复」的同一套逻辑。 */
+    suspend fun restoreCloudBackup(config: CloudConfig, password: CharArray): Result<Unit> =
+        runCatching {
+            val bytes = CloudBackupClient.download(config).getOrThrow()
+            restoreEncryptedBackup(ByteArrayInputStream(bytes), password).getOrThrow()
+        }
+
+    fun cloudConfig(): CloudConfig = container.cloudBackupStore.load()
+
+    fun saveCloudConfig(config: CloudConfig) = container.cloudBackupStore.save(config)
+
+    fun clearCloudConfig() = container.cloudBackupStore.clear()
 
     fun scaleDef(type: String) = ScaleCatalog.byType(type)
 

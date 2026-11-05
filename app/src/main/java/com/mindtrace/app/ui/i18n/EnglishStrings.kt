@@ -1002,12 +1002,76 @@ internal object EnglishStrings {
         // ---------- 反馈 ----------
         put("1. 问题发生在哪个页面\n2. 点击了哪些按钮、先后顺序\n3. 预期看到什么，实际看到什么\n4. 截图（请先遮住姓名、药名、日记等真实内容）\n5. 点下方按钮复制的诊断信息", "1. Which screen the problem occurred on\n2. Which buttons you tapped, in what order\n3. What you expected vs. what happened\n4. Screenshots (cover names, medication, journal entries and other real content)\n5. The diagnostic info copied with the button below")
         put("反馈渠道：请通过你获取心迹的平台（如 B 站、小红书或 GitHub）私信/评论作者，并附上上面的诊断信息。", "Feedback: message or comment to the author on the platform where you found MindTrace (e.g. Bilibili, Xiaohongshu or GitHub), and include the diagnostic info above.")
+
+        // ---------- 补记服药 ----------
+        put("补记", "Backfill")
+        put("补记服药", "Backfill doses")
+        put("选择日期，直接修改那天的服药记录", "Pick a date and edit that day's medication logs")
+        put("不能补记未来的日期", "Cannot backfill a future date")
+        put("这一天没有需要按时服用的药物", "No scheduled medication for this day")
+        put("这一天没有需要按时服用的药物。", "No scheduled medication for this day.")
+        put("按时服药", "Scheduled doses")
+        put("点一下即可在「已服 / 未服」之间切换", "Tap to switch between taken / not taken")
+        put("已服", "Taken")
+        put("待服用", "Pending")
+        put("已跳过", "Skipped")
+        put("漏服", "Missed")
+        put("标记已服", "Mark taken")
+        put("撤销", "Undo")
+        put("选好时间，补写那一天的一次记录", "Choose a time and add a dose for that day")
+        put("服用时间", "Time taken")
+        put("补一次", "Add one")
+        put("这一天的服药记录", "This day's medication logs")
+        put("删除某条记录后，依从率会同步变化", "Deleting a log also updates adherence")
+        put("这一天还没有服药记录。", "No medication logs for this day.")
+        put("已删除的药物", "Removed medication")
+        put("这里修改的就是原有的服药记录：写入、撤销或删除都会直接改变这一天的记录，近 30 天依从率、趋势图与复诊报告也会跟着更新。不会留下额外的「补记」标记。", "These are the original medication logs. Adding, undoing or deleting a record changes that day's data, and adherence, trends and reports update accordingly. No extra backfill tag is stored.")
+
+        // ---------- 云备份 ----------
+        put("云备份", "Cloud backup")
+        put("WebDAV / Gitee / GitHub，上传加密备份或下载恢复", "WebDAV / Gitee / GitHub — upload or restore an encrypted backup")
+        put("把加密备份上传到你自己的云端", "Upload encrypted backups to your own cloud")
+        put("备份文件始终是加密的 .mtrbackup，与本地导出的格式完全一致。只有点击上传或下载时才会联网；连接凭据只保存在本机，备份密码不会被保存。", "The backup is always an encrypted .mtrbackup, identical to local exports. The app only uses the network when you tap upload or download; credentials stay on this device and the backup password is never stored.")
+        put("备份平台", "Backup service")
+        put("填写完整的 HTTPS 文件地址（包含备份文件名），使用账号密码或应用专用密码。", "Enter the full HTTPS file URL (including the backup filename) and use your account or app password.")
+        put("备份会作为文件上传到 Gitee 仓库。私人令牌需要该仓库的写权限。", "The backup is uploaded as a file to a Gitee repository. The personal token needs write access to that repo.")
+        put("备份会作为文件上传到 GitHub 仓库。令牌需要 Contents 读写权限；私有仓库更安全。", "The backup is uploaded as a file to a GitHub repository. The token needs Contents read/write access; a private repo is safer.")
+        put("连接配置", "Connection")
+        put("WebDAV 文件地址", "WebDAV file URL")
+        put("密码 / 应用专用密码", "Password / app password")
+        put("仓库所有者", "Repository owner")
+        put("仓库名", "Repository name")
+        put("分支", "Branch")
+        put("文件路径", "File path")
+        put("访问令牌", "Access token")
+        put("密码与令牌由系统密钥库加密后仅存本机；应用不会把凭据或数据发送到其他地方。", "Passwords and tokens are encrypted with the system keystore and stay on this device. Nothing is sent anywhere else.")
+        put("上传与恢复", "Upload & restore")
+        put("保存配置", "Save settings")
+        put("上传备份到云端", "Upload backup")
+        put("从云端下载并恢复", "Download & restore")
+        put("清除已保存的连接配置", "Clear saved connection")
+        put("云端文件即使被他人看到也只是加密备份，无法在没有密码的情况下读取。忘记密码时这份备份无法恢复；更换手机前请先确认云端备份可用。", "Even if someone sees the cloud file, it is an encrypted backup and cannot be read without the password. There is no password recovery; verify your cloud backup before switching phones.")
+        put("云备份配置已保存", "Cloud backup settings saved")
+        put("请先填写并保存云备份配置", "Fill in and save the cloud backup settings first")
+        put("云备份已上传", "Backup uploaded")
+        put("上传失败：", "Upload failed: ")
+        put("正在处理…", "Working…")
+        put("已清除云备份配置", "Cloud backup settings cleared")
+        put("上传的是加密备份。密码不会保存在应用里，忘记后无法恢复。", "An encrypted backup is uploaded. The password is not stored and cannot be recovered.")
+        put("输入上传时使用的密码。恢复会覆盖当前全部数据。", "Enter the password used when uploading. Restoring overwrites all current data.")
+        put("备份密码", "Backup password")
+        put("上传", "Upload")
+        put("下载并恢复", "Download & restore")
+        put("从云端恢复？", "Restore from cloud?")
+        put("下载云端备份会覆盖当前全部记录、药物、量表、日记与安全计划。建议先上传一次当前数据。", "Restoring a cloud backup overwrites all records, medications, scales, journals and your safety plan. Upload your current data first.")
     }
 
     /**
      * 带变量或拼接的文案。按顺序匹配，第一条命中即返回。
      */
     private val rules: List<Pair<Regex, (MatchResult) -> String>> = listOf(
+        Regex("^已服 (\\d+) / (\\d+) 次$") to { "\$1 of \$2 doses taken" },
+        Regex("^当天 (\\d+) 次$") to { "\$1 logged that day" },
         Regex("^已启用 (\\d+) 项 · 只会在打卡时出现$") to { "Enabled: \$1 · shown only in check-in" },
         Regex("^已启用 (\\d+) 项 · 可自定义$") to { "Enabled: \$1 · customizable" },
         Regex("^每天 (\\d{2}:\\d{2})$") to { "Every day at \$1" },

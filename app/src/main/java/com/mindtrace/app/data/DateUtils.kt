@@ -94,6 +94,16 @@ object DateUtils {
 
     fun nowTimestamp(): Long = System.currentTimeMillis()
 
+    /** 把某一天的 HH:mm 转成本地时区时间戳，供补写历史服药记录的 takenAt 使用。 */
+    fun timestampOf(dateIso: String, time: String): Long {
+        val date = parse(dateIso) ?: return System.currentTimeMillis()
+        val parts = time.split(':')
+        val hour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23)
+        val minute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
+        val moment = if (hour == null) date.atStartOfDay() else date.atTime(hour, minute)
+        return moment.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
     fun timeOfTimestamp(timestamp: Long): String {
         val dt = java.time.Instant.ofEpochMilli(timestamp)
             .atZone(java.time.ZoneId.systemDefault())
