@@ -67,7 +67,8 @@ fun MedicationsScreen(
     viewModel: AppViewModel,
     onAddMedication: () -> Unit,
     onEditMedication: (Long) -> Unit,
-    onBackdatedCheckIn: (String) -> Unit
+    onBackdatedCheckIn: (String) -> Unit,
+    onBackfill: () -> Unit = {}
 ) {
     val medications by viewModel.allMedications.collectAsStateWithLifecycle()
     val todayLogs by viewModel.todayLogs.collectAsStateWithLifecycle()
@@ -108,9 +109,12 @@ fun MedicationsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                TextButton(onClick = onAddMedication) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text("  添加")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onBackfill) { Text("补记") }
+                    TextButton(onClick = onAddMedication) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("  添加")
+                    }
                 }
             }
         }

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 完全离线：刻意不申请 INTERNET 权限。 -->
+    <!-- 默认仍然完全离线：只有用户在「云备份」页手动上传 / 下载时才会使用网络。
+         云备份传输的始终是本机的加密 .mtrbackup 文件。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />

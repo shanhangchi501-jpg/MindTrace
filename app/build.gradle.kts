@@ -19,13 +19,15 @@ val keystoreProperties = Properties().apply {
 android {
     namespace = "com.mindtrace.app"
     compileSdk = 35
+    // 显式使用本机已安装的 Build Tools，避免无网络环境下自动下载 35.0.0。
+    buildToolsVersion = "34.0.0"
 
     defaultConfig {
         applicationId = "com.mindtrace.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.3.0"
+        versionCode = 15
+        versionName = "0.4.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

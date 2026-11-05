@@ -14,6 +14,7 @@ class AppContainer(context: Context) {
 
     val settings = SettingsStore(appContext)
     val keyManager = DatabaseKeyManager(appContext)
+    val cloudBackupStore = CloudBackupStore(appContext)
 
     init {
         AppLocale.current = settings.resolvedLanguage()

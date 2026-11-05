@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FileDownload
@@ -100,6 +101,7 @@ fun SettingsScreen(
     onOpenSafety: () -> Unit = {},
     onOpenCrisis: () -> Unit = {},
     onOpenReport: () -> Unit = {},
+    onOpenCloudBackup: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
     onOpenReminderHelp: () -> Unit = {},
@@ -619,6 +621,12 @@ fun SettingsScreen(
                     title = "从备份恢复",
                     subtitle = "恢复会覆盖当前全部数据",
                     onClick = { openBackup.launch(arrayOf("application/octet-stream", "*/*")) }
+                )
+                SettingRow(
+                    icon = Icons.Rounded.CloudUpload,
+                    title = "云备份",
+                    subtitle = "WebDAV / Gitee / GitHub，上传加密备份或下载恢复",
+                    onClick = onOpenCloudBackup
                 )
                 SettingRow(
                     icon = Icons.Rounded.Warning,

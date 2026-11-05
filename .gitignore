@@ -34,3 +34,6 @@ __pycache__/
 internal/
 cover/
 xhs/
+
+# WorkBuddy 工作区数据（本地记忆与配置，不进入仓库）
+.workbuddy/

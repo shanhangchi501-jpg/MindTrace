@@ -47,6 +47,8 @@ private object Routes {
     const val CHECK_IN = "checkin/{date}"
     const val JOURNAL_EDIT = "journal_edit/{journalId}/{date}"
     const val MED_EDIT = "med_edit/{medId}"
+    const val MED_BACKFILL = "med_backfill"
+    const val CLOUD_BACKUP = "cloud_backup"
     const val SCALES = "scales"
     const val SCALES_ALL = "scales_all"
     const val SCALE = "scale/{type}"
@@ -187,7 +189,22 @@ fun MainApp(
                         viewModel = viewModel,
                         onAddMedication = { navController.navigate("med_edit/0") },
                         onEditMedication = { id -> navController.navigate("med_edit/$id") },
-                        onBackdatedCheckIn = { date -> navController.navigate("checkin/$date") }
+                        onBackdatedCheckIn = { date -> navController.navigate("checkin/$date") },
+                        onBackfill = { navController.navigate(Routes.MED_BACKFILL) }
+                    )
+                }
+
+                composable(Routes.MED_BACKFILL) {
+                    MedicationBackfillScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Routes.CLOUD_BACKUP) {
+                    CloudBackupScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
                     )
                 }
 
@@ -225,7 +242,8 @@ fun MainApp(
                         onOpenDiagnoses = { navController.navigate(Routes.DIAGNOSES) },
                         onOpenSafety = { navController.navigate(Routes.SAFETY) },
                         onOpenCrisis = { navController.navigate(Routes.CRISIS) },
-                        onOpenReport = { navController.navigate(Routes.REPORT) }
+                        onOpenReport = { navController.navigate(Routes.REPORT) },
+                        onOpenCloudBackup = { navController.navigate(Routes.CLOUD_BACKUP) }
                     )
                 }
 

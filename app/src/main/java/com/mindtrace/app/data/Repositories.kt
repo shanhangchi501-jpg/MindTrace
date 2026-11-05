@@ -231,6 +231,33 @@ class MedicationRepository(
 
     suspend fun deleteLog(id: Long) = logDao.deleteById(id)
 
+    /**
+     * 补记 / 修正历史服药数据：直接写入或移除指定日期的一条 medication_logs 记录。
+     * 不新增表、不新增字段，也不做「补记」标记；依从率、趋势与复诊报告都按修改后的记录计算。
+     */
+    suspend fun setDoseRecord(
+        medicationId: Long,
+        date: String,
+        time: String,
+        taken: Boolean,
+        takenAt: Long
+    ) {
+        val existing = logDao.getFor(medicationId, date, time)
+        if (!taken) {
+            if (existing != null) logDao.deleteById(existing.id)
+            return
+        }
+        val entity = existing?.copy(status = "taken", takenAt = takenAt)
+            ?: MedicationLogEntity(
+                medicationId = medicationId,
+                date = date,
+                time = time,
+                status = "taken",
+                takenAt = takenAt
+            )
+        logDao.upsert(entity)
+    }
+
     suspend fun dosesFor(date: String, medications: List<MedicationEntity>, logs: List<MedicationLogEntity>): List<DoseSlot> {
         val target = DateUtils.parse(date) ?: return emptyList()
         val today = DateUtils.today()
