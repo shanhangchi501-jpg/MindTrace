@@ -17,6 +17,7 @@ class AppContainer(context: Context) {
 
     init {
         AppLocale.current = settings.resolvedLanguage()
+        settings.appLaunchCount = settings.appLaunchCount + 1
     }
 
     val database: MindTraceDatabase by lazy {

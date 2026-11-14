@@ -1,15 +1,21 @@
 package com.mindtrace.app.ui.theme
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -104,6 +110,78 @@ private val DarkColors = darkColorScheme(
     onErrorContainer = Color(0xFFF7DDDA)
 )
 
+/** 主题色系：只替换主色/辅色，背景与中性色保持暖纸/夜间基调。 */
+private data class AccentPalette(
+    val lightPrimary: Long, val lightPrimaryContainer: Long, val lightOnPrimaryContainer: Long,
+    val lightSecondary: Long, val lightSecondaryContainer: Long,
+    val lightTertiary: Long, val lightTertiaryContainer: Long,
+    val darkPrimary: Long, val darkPrimaryContainer: Long, val darkOnPrimaryContainer: Long,
+    val darkSecondary: Long, val darkSecondaryContainer: Long,
+    val darkTertiary: Long, val darkTertiaryContainer: Long,
+    val lightBackground: Long = 0L, val lightSurface: Long = 0L,
+    val darkBackground: Long = 0L, val darkSurface: Long = 0L
+)
+
+private fun Long.color() = Color(this)
+
+private val PaletteSage = AccentPalette(
+    0xFF6B8F7B, 0xFFDDEADF, 0xFF1C2B22, 0xFFB8835E, 0xFFF3E2D4, 0xFF7389A6, 0xFFDEE6F1,
+    0xFFB6CDBA, 0xFF33483A, 0xFFDCE9DE, 0xFFE3C0A0, 0xFF55402E, 0xFFB3C4D9, 0xFF35485C,
+    0xFFF6F1E8, 0xFFFFFCF7, 0xFF14110F, 0xFF1E1A17
+)
+private val PaletteOcean = AccentPalette(
+    0xFF4F7FA8, 0xFFD7E6F4, 0xFF102A3E, 0xFF5E8A8C, 0xFFD8E9EA, 0xFF7A82B0, 0xFFE1E2F4,
+    0xFFA9C8E6, 0xFF2C4A63, 0xFFD7E8F8, 0xFFB7D3D4, 0xFF355556, 0xFFC3C7E8, 0xFF3F4468,
+    0xFFEEF3F8, 0xFFF7FBFE, 0xFF0D141B, 0xFF16212B
+)
+private val PalettePlum = AccentPalette(
+    0xFF8A5F9E, 0xFFEEDFF5, 0xFF301C3A, 0xFFA86B85, 0xFFF5E0E8, 0xFF8E7DA8, 0xFFE7E0F0,
+    0xFFD5B8E5, 0xFF4C3560, 0xFFEFE1F8, 0xFFE3BDCD, 0xFF583846, 0xFFC9BEE0, 0xFF473C5C,
+    0xFFF7F0FA, 0xFFFDF8FF, 0xFF150F1B, 0xFF201827
+)
+private val PaletteAmber = AccentPalette(
+    0xFF9A6B2F, 0xFFF6E6CA, 0xFF3A2810, 0xFFA9703F, 0xFFF3E2D4, 0xFF8A8250, 0xFFEFEAD3,
+    0xFFE8C48A, 0xFF5C4323, 0xFFF8E6C8, 0xFFDDB58A, 0xFF5A4028, 0xFFD4CC9A, 0xFF4E4A2C,
+    0xFFF8F0E2, 0xFFFFFAF0, 0xFF161008, 0xFF221A0F
+)
+private val PaletteRose = AccentPalette(
+    0xFFA85A6E, 0xFFF7DDE4, 0xFF3D1620, 0xFFB07A5E, 0xFFF4E2D7, 0xFF97709A, 0xFFEEDFEF,
+    0xFFE8B4C1, 0xFF63323E, 0xFFFBE2E8, 0xFFE0BBA2, 0xFF5A3D2D, 0xFFD6B6D8, 0xFF513A52,
+    0xFFFAF0F2, 0xFFFFF8FA, 0xFF170F12, 0xFF241A1E
+)
+
+private fun paletteFor(name: String): AccentPalette? = when (name) {
+    "ocean" -> PaletteOcean
+    "plum" -> PalettePlum
+    "amber" -> PaletteAmber
+    "rose" -> PaletteRose
+    "sage" -> PaletteSage
+    else -> null
+}
+
+private fun applyPalette(base: ColorScheme, palette: AccentPalette, dark: Boolean): ColorScheme =
+    if (dark) base.copy(
+        primary = palette.darkPrimary.color(),
+        primaryContainer = palette.darkPrimaryContainer.color(),
+        onPrimaryContainer = palette.darkOnPrimaryContainer.color(),
+        secondary = palette.darkSecondary.color(),
+        secondaryContainer = palette.darkSecondaryContainer.color(),
+        tertiary = palette.darkTertiary.color(),
+        tertiaryContainer = palette.darkTertiaryContainer.color(),
+        background = if (palette.darkBackground != 0L) palette.darkBackground.color() else base.background,
+        surface = if (palette.darkSurface != 0L) palette.darkSurface.color() else base.surface
+    ) else base.copy(
+        primary = palette.lightPrimary.color(),
+        primaryContainer = palette.lightPrimaryContainer.color(),
+        onPrimaryContainer = palette.lightOnPrimaryContainer.color(),
+        secondary = palette.lightSecondary.color(),
+        secondaryContainer = palette.lightSecondaryContainer.color(),
+        tertiary = palette.lightTertiary.color(),
+        tertiaryContainer = palette.lightTertiaryContainer.color(),
+        background = if (palette.lightBackground != 0L) palette.lightBackground.color() else base.background,
+        surface = if (palette.lightSurface != 0L) palette.lightSurface.color() else base.surface
+    )
+
 private val MindTraceTypography = Typography(
     displaySmall = TextStyle(
         fontFamily = FontFamily.Serif,
@@ -184,20 +262,34 @@ private val MindTraceShapes = Shapes(
 @Composable
 fun MindTraceTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    colorTheme: String = "sage",
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) DarkColors else LightColors
+    val base = if (darkTheme) DarkColors else LightColors
+    val palette = paletteFor(colorTheme)
+    val colors = if (palette == null) base else applyPalette(base, palette, darkTheme)
     MaterialTheme(
         colorScheme = colors,
         typography = MindTraceTypography,
         shapes = MindTraceShapes
     ) {
-        // 统一默认文字颜色。部分自定义 Box 卡片没有 Surface 的 contentColor，
-        // 不显式设色时会退回系统默认黑色；在深色模式下会出现黑字。
-        CompositionLocalProvider(
-            LocalContentColor provides colors.onBackground,
-            content = content
-        )
+        // 全局渐变背景：让半透明毛玻璃卡片有可透出的层次与光影。
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(colors.background, colors.surfaceContainerLow)
+                    )
+                )
+        ) {
+            // 统一默认文字颜色。部分自定义 Box 卡片没有 Surface 的 contentColor，
+            // 不显式设色时会退回系统默认黑色；在深色模式下会出现黑字。
+            CompositionLocalProvider(
+                LocalContentColor provides colors.onBackground,
+                content = content
+            )
+        }
     }
 }
 

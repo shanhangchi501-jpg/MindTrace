@@ -77,9 +77,15 @@ data class MedicationEntity(
     val createdAt: Long
 )
 
-fun MedicationEntity.displayLabel(): String =
-    if (dosage.isBlank()) name.trim()
-    else "${name.trim()} ${dosage.trim()}${unit.trim()}".trim()
+fun MedicationEntity.displayName(): String =
+    MedicationPresets.localizedName(name, AppLocale.current.isEnglish).trim()
+
+fun MedicationEntity.displayLabel(): String {
+    // 预设药物按当前界面语言显示通用名，切换语言时不留另一种语言的残留。
+    val localized = MedicationPresets.localizedName(name, AppLocale.current.isEnglish)
+    return if (dosage.isBlank()) localized.trim()
+    else "${localized.trim()} ${dosage.trim()}${unit.trim()}".trim()
+}
 
 @Serializable
 @Entity(tableName = "medication_logs")

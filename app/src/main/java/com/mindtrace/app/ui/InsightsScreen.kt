@@ -169,8 +169,8 @@ fun InsightsScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MetricTile(
                         label = "记录天数",
-                        value = "$recordedDays",
-                        suffix = " / $days 天",
+                        value = "$recordedDays/$days",
+                        suffix = "",
                         modifier = Modifier.weight(1f)
                     )
                     MetricTile(

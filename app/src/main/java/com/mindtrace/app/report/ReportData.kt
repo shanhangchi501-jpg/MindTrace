@@ -81,6 +81,7 @@ data class ReportData(
                 }
             }
             return stats.entries
+                .filter { it.key != "concentration" }
                 .map { (id, acc) ->
                     SymptomStat(
                         id = id,

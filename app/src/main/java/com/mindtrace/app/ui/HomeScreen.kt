@@ -190,7 +190,7 @@ fun HomeScreen(
                         TextButton(onClick = onOpenMedications) { Text("全部") }
                     }
                     Spacer(Modifier.height(6.dp))
-                    doses.take(4).forEach { dose ->
+                    doses.forEach { dose ->
                         DoseRow(
                             dose = dose,
                             onTake = {
@@ -199,14 +199,6 @@ fun HomeScreen(
                             onClear = {
                                 viewModel.clearDose(dose.medication.id, today, dose.time)
                             }
-                        )
-                    }
-                    if (doses.size > 4) {
-                        Text(
-                            "还有 ${doses.size - 4} 次用药，去药物页查看。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 6.dp)
                         )
                     }
                     if (asNeededMeds.isNotEmpty()) {
@@ -530,11 +522,10 @@ private fun QuickAction(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp, horizontal = 8.dp),
+    SoftCard(
+        modifier = modifier,
+        onClick = onClick,
+        contentPadding = PaddingValues(vertical = 14.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(

@@ -2,6 +2,7 @@ package com.mindtrace.app.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,14 +18,19 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Undo
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +39,9 @@ import com.mindtrace.app.ui.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -52,6 +65,7 @@ import com.mindtrace.app.data.DoseStatus
 import com.mindtrace.app.data.MedicationEntity
 import com.mindtrace.app.data.MedicationLogEntity
 import com.mindtrace.app.data.displayLabel
+import com.mindtrace.app.data.displayName
 import kotlinx.coroutines.delay
 import com.mindtrace.app.ui.components.AdherenceRing
 import com.mindtrace.app.ui.components.EmptyState
@@ -67,7 +81,8 @@ fun MedicationsScreen(
     viewModel: AppViewModel,
     onAddMedication: () -> Unit,
     onEditMedication: (Long) -> Unit,
-    onBackdatedCheckIn: (String) -> Unit
+    onBackdatedCheckIn: (String) -> Unit,
+    onOpenBackfill: () -> Unit
 ) {
     val medications by viewModel.allMedications.collectAsStateWithLifecycle()
     val todayLogs by viewModel.todayLogs.collectAsStateWithLifecycle()
@@ -83,6 +98,23 @@ fun MedicationsScreen(
     }
 
     val active = medications.filter { it.active }
+    val orderIds = remember(settings.medicationOrder) {
+        settings.medicationOrder.split(',').mapNotNull { it.trim().toLongOrNull() }
+    }
+    val orderedActive = remember(active, orderIds) {
+        active.sortedBy { med ->
+            val index = orderIds.indexOf(med.id)
+            if (index >= 0) index else Int.MAX_VALUE
+        }
+    }
+    var dragId by remember { mutableStateOf<Long?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val itemHeights = remember { mutableStateMapOf<Long, Int>() }
+    var localOrder by remember { mutableStateOf(orderedActive.map { it.id }) }
+    LaunchedEffect(orderedActive.map { it.id }, dragId) {
+        if (dragId == null) localOrder = orderedActive.map { it.id }
+    }
+    val haptics = LocalHapticFeedback.current
     val inactive = medications.filterNot { it.active }
     val asNeeded = active.filter { it.asNeeded }
     val takenToday = doses.count { it.status == DoseStatus.TAKEN }
@@ -95,6 +127,7 @@ fun MedicationsScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding(),
+        userScrollEnabled = dragId == null,
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -107,6 +140,10 @@ fun MedicationsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                TextButton(onClick = onOpenBackfill) {
+                    Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("  补记")
                 }
                 TextButton(onClick = onAddMedication) {
                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -234,15 +271,89 @@ fun MedicationsScreen(
             }
         }
 
-        if (active.isNotEmpty()) {
+                if (orderedActive.isNotEmpty()) {
             item {
-                SectionTitle("在服药物", subtitle = "点击查看或修改")
+                SectionTitle("在服药物", subtitle = "点击查看 · 长按拖动排序")
             }
-            items(active.size, key = { active[it].id }) { index ->
-                MedicationCard(
-                    medication = active[index],
-                    onClick = { onEditMedication(active[index].id) }
-                )
+            itemsIndexed(localOrder, key = { _, id -> id }) { _, id ->
+                val med = active.firstOrNull { it.id == id }
+                if (med != null) {
+                    val settledOffset by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (dragId == id) dragOffset else 0f,
+                        animationSpec = if (dragId == id) {
+                            androidx.compose.animation.core.snap()
+                        } else {
+                            androidx.compose.animation.core.spring(
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                            )
+                        },
+                        label = "medDragOffset"
+                    )
+                    val itemModifier = if (dragId == id) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        Modifier.fillMaxWidth().animateItem()
+                    }
+                    Box(
+                        modifier = itemModifier
+                            .zIndex(if (dragId == id) 1f else 0f)
+                            .graphicsLayer {
+                                translationY = settledOffset
+                            }
+                            .onSizeChanged { itemHeights[id] = it.height }
+                            .pointerInput(id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        dragId = id
+                                        dragOffset = 0f
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount.y
+                                        var index = localOrder.indexOf(id)
+                                        while (index in 0 until localOrder.size - 1) {
+                                            val nextH = (itemHeights[localOrder[index + 1]] ?: 120).toFloat()
+                                            if (dragOffset <= nextH * 0.65f) break
+                                            dragOffset -= nextH
+                                            val nextId = localOrder[index + 1]
+                                            val list = localOrder.toMutableList()
+                                            list[index] = nextId
+                                            list[index + 1] = id
+                                            localOrder = list
+                                            index++
+                                        }
+                                        while (index > 0) {
+                                            val prevH = (itemHeights[localOrder[index - 1]] ?: 120).toFloat()
+                                            if (dragOffset >= -prevH * 0.65f) break
+                                            dragOffset += prevH
+                                            val prevId = localOrder[index - 1]
+                                            val list = localOrder.toMutableList()
+                                            list[index] = prevId
+                                            list[index - 1] = id
+                                            localOrder = list
+                                            index--
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        viewModel.setMedicationOrder(localOrder)
+                                        dragId = null
+                                        dragOffset = 0f
+                                    },
+                                    onDragCancel = {
+                                        viewModel.setMedicationOrder(localOrder)
+                                        dragId = null
+                                        dragOffset = 0f
+                                    }
+                                )
+                            }
+                    ) {
+                        MedicationCard(
+                            medication = med,
+                            onClick = { onEditMedication(med.id) }
+                        )
+                    }
+                }
             }
         }
 
@@ -420,10 +531,12 @@ fun AsNeededMedicationRow(
 private fun MedicationCard(
     medication: MedicationEntity,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     muted: Boolean = false
 ) {
     SoftCard(
         onClick = onClick,
+        onLongClick = onLongClick,
         containerColor = if (muted) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         else MaterialTheme.colorScheme.surface
     ) {
@@ -449,7 +562,7 @@ private fun MedicationCard(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    medication.name,
+                    medication.displayName(),
                     style = MaterialTheme.typography.titleMedium,
                     color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                 )

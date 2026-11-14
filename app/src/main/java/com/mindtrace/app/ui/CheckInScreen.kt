@@ -311,7 +311,10 @@ fun CheckInScreen(
                             Spacer(Modifier.height(14.dp))
                         }
 
-                        if (selectedSymptoms.isNotEmpty()) {
+                        val severitySymptoms = enabledSymptoms.filter {
+                            it.id in selectedSymptoms && it.id != "concentration"
+                        }
+                        if (severitySymptoms.isNotEmpty()) {
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 "症状强度（可选）",
@@ -325,9 +328,7 @@ fun CheckInScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(10.dp))
-                            enabledSymptoms
-                                .filter { it.id in selectedSymptoms }
-                                .forEach { symptom ->
+                            severitySymptoms.forEach { symptom ->
                                     IntensitySlider(
                                         label = symptom.name,
                                         value = symptomSeverity[symptom.id],

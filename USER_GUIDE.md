@@ -1,6 +1,6 @@
 # 心迹 使用说明
 
-适用版本：0.3.0  
+适用版本：0.4.0  
 包名：`com.mindtrace.app`  
 系统要求：Android 8.0（API 26）及以上  
 语言：简体中文 / English（可在「我的 → 右上角齿轮 → 语言」切换）
@@ -15,7 +15,7 @@
 
 ### 从 APK 安装
 
-1. 下载 `MindTrace-0.3.0-release.apk`。
+1. 下载 `MindTrace-0.4.0-release.apk`。
 2. 在文件管理器中点击 APK。
 3. 如果系统提示「禁止安装未知应用」，按提示允许当前文件管理器安装应用。
 4. 安装完成后打开「心迹」。
@@ -247,10 +247,10 @@ PDF 在本机生成，不会上传到任何服务器。报告是**未加密的�
 
 - 内容为虚构用户「林晚」约一个月的记录，不含任何真实个人信息
 - 包含打卡、症状、药物与服药日志、量表、日记、安全计划、联系人和诊断
-- 备份密码：`MindTraceTest2026`
+- 备份密码：`mindtrace-demo`
 - 恢复后可在「我的 → 数据与报告 → 删除全部数据」清空，再开始自己的记录
 
-另有 `MindTrace-0.3.0-schizophrenia-demo.mtrbackup`，包含 11 个带 0–10 强度的阳性/阴性症状，用于检查两种 PDF 版式；密码同样是 `MindTraceTest2026`，说明见 `dist/MindTrace-0.3.0-test-dataset.md`。
+另有 `MindTrace-Demo-Dataset.mtbackup`：30 天打卡、3 种药物、62 条服药记录、5 份量表、4 篇日记与安全计划，适合演示、录屏与检查报告版式；密码 `mindtrace-demo`。
 
 ### 忘记密码
 

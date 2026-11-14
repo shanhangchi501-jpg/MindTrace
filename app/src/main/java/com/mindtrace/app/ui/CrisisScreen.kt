@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,23 +24,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.Spa
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.mindtrace.app.ui.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mindtrace.app.data.CrisisDirectory
 import com.mindtrace.app.data.SafetyCatalog
 import com.mindtrace.app.ui.components.PrimaryActionButton
 import com.mindtrace.app.ui.components.ScreenHeader
 import com.mindtrace.app.ui.components.SoftCard
 import com.mindtrace.app.ui.components.WarmBackground
+import com.mindtrace.app.ui.i18n.LocalAppLanguage
 
 @Composable
 fun CrisisScreen(
@@ -49,6 +57,23 @@ fun CrisisScreen(
 ) {
     val context = LocalContext.current
     val contacts by viewModel.contacts.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val english = LocalAppLanguage.current.isEnglish
+    val region = CrisisDirectory.forCode(settings.crisisCountry)
+    var regionMenu by remember { mutableStateOf(false) }
+    val emergencyLine = if (region.emergency == region.police) {
+        if (english) {
+            "If you are injured, have overdosed, or feel you may hurt yourself right now, call ${region.emergency} immediately."
+        } else {
+            "如果已经受伤、服药过量，或觉得自己可能马上会伤害自己，请立即拨打 ${region.emergency}。"
+        }
+    } else {
+        if (english) {
+            "If you are injured, have overdosed, or feel you may hurt yourself right now, call ${region.emergency} or ${region.police} immediately."
+        } else {
+            "如果已经受伤、服药过量，或觉得自己可能马上会伤害自己，请立即拨打 ${region.emergency} 或 ${region.police}。"
+        }
+    }
 
     fun dial(number: String) {
         runCatching {
@@ -75,6 +100,33 @@ fun CrisisScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (english) "Emergency numbers region" else "紧急电话地区",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Box {
+                            TextButton(onClick = { regionMenu = true }) {
+                                Text(if (english) region.nameEn else region.nameZh)
+                            }
+                            DropdownMenu(expanded = regionMenu, onDismissRequest = { regionMenu = false }) {
+                                CrisisDirectory.regions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (english) option.nameEn else option.nameZh) },
+                                        onClick = {
+                                            viewModel.setCrisisCountry(option.code)
+                                            regionMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -97,33 +149,39 @@ fun CrisisScreen(
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "如果已经受伤、服药过量，或觉得自己可能马上会伤害自己，请立即拨打 120 或 110。",
+                            emergencyLine,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                 }
 
-                item {
-                    PrimaryActionButton(
-                        text = "拨打心理援助热线 12356",
-                        onClick = { dial("12356") }
-                    )
+                if (region.hotline != null) {
+                    item {
+                        PrimaryActionButton(
+                            text = if (english) {
+                                "Call ${region.hotlineLabelEn} ${region.hotline}"
+                            } else {
+                                "拨打 ${region.hotlineLabelZh} ${region.hotline}"
+                            },
+                            onClick = { region.hotline?.let { dial(it) } }
+                        )
+                    }
                 }
 
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         CrisisCallButton(
-                            title = "急救",
-                            number = "120",
+                            title = if (english) "Emergency" else "急救",
+                            number = region.emergency,
                             modifier = Modifier.weight(1f),
-                            onClick = { dial("120") }
+                            onClick = { dial(region.emergency) }
                         )
                         CrisisCallButton(
-                            title = "报警",
-                            number = "110",
+                            title = if (english) "Police" else "报警",
+                            number = region.police,
                             modifier = Modifier.weight(1f),
-                            onClick = { dial("110") }
+                            onClick = { dial(region.police) }
                         )
                     }
                 }

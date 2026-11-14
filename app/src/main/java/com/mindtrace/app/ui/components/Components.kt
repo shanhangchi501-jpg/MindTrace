@@ -3,7 +3,10 @@ package com.mindtrace.app.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,8 +17,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +33,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Info
@@ -59,19 +66,24 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mindtrace.app.data.DateUtils
@@ -87,45 +99,118 @@ fun WarmBackground(
     content: @Composable BoxScope.() -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        colors.background,
-                        colors.background,
-                        colors.surfaceContainerLow
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            colors.background,
+                            colors.surfaceContainerLow,
+                            colors.background
+                        )
                     )
                 )
-            ),
-        content = content
-    )
+        )
+        // 主题色「极光」光斑：让背景有光影层次，半透明卡片才有可透出的质感。
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(colors.primary.copy(alpha = 0.32f), Color.Transparent),
+                    center = Offset(w * 0.18f, h * 0.10f),
+                    radius = w * 0.95f
+                ),
+                radius = w * 0.95f,
+                center = Offset(w * 0.18f, h * 0.10f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(colors.tertiary.copy(alpha = 0.24f), Color.Transparent),
+                    center = Offset(w * 0.95f, h * 0.36f),
+                    radius = w * 0.9f
+                ),
+                radius = w * 0.9f,
+                center = Offset(w * 0.95f, h * 0.36f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(colors.secondary.copy(alpha = 0.20f), Color.Transparent),
+                    center = Offset(w * 0.22f, h * 0.92f),
+                    radius = w * 1.05f
+                ),
+                radius = w * 1.05f,
+                center = Offset(w * 0.22f, h * 0.92f)
+            )
+        }
+        content()
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SoftCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     containerColor: Color = MaterialTheme.colorScheme.surface,
+    contentPadding: PaddingValues = PaddingValues(18.dp),
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = MaterialTheme.shapes.large
-    // 半透明容器色先与背景合成，避免阴影在卡片内部透出矩形色块。
-    val cardColor = containerColor.compositeOver(MaterialTheme.colorScheme.background)
-    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+    // 毛玻璃卡片：用 Canvas 自绘圆角渐变 + 主题色外发光，避免系统 elevation
+    // 阴影在部分 GPU（尤其模拟器软渲染）上被画成矩形色块。
+    val primary = MaterialTheme.colorScheme.primary
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val glassTop = if (isDark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.30f)
+    val glassMid = containerColor.copy(alpha = if (isDark) 0.46f else 0.62f)
+    val glassBottom = containerColor.copy(alpha = if (isDark) 0.32f else 0.46f)
+    val borderColor = if (isDark) Color.White.copy(alpha = 0.15f)
+        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f)
+    val corner = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
     val base = Modifier
         .fillMaxWidth()
-        .clip(shape)
-        .background(cardColor)
-        .border(1.dp, borderColor, shape)
-    val clickable = if (onClick != null) {
-        base.clickable(onClick = onClick)
-    } else {
-        base
+        .drawBehind {
+            // 柔和外发光（分层圆角矩形，替代 elevation 阴影）；只向下扩散，避免光晕压过文字。
+            for (i in 1..6) {
+                drawRoundRect(
+                    color = primary.copy(alpha = if (isDark) 0.010f else 0.008f),
+                    topLeft = androidx.compose.ui.geometry.Offset(-i * 1.2f, i * 2.0f),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width + i * 2.4f,
+                        size.height + i * 3.6f
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner + i * 1.8f)
+                )
+            }
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(glassTop, glassMid, glassBottom),
+                    startY = 0f,
+                    endY = size.height
+                ),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner)
+            )
+            drawRoundRect(
+                color = borderColor,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner)
+            )
+        }
+    val clickable = when {
+        onLongClick != null -> base.combinedClickable(
+            onClick = onClick ?: {},
+            onLongClick = onLongClick
+        )
+        onClick != null -> base.clickable(onClick = onClick)
+        else -> base
     }
     Column(
-        modifier = modifier.then(clickable).padding(18.dp),
+        modifier = modifier.then(clickable).padding(contentPadding),
+        horizontalAlignment = horizontalAlignment,
         content = content
     )
 }
@@ -487,15 +572,31 @@ fun MetricTile(
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), MaterialTheme.shapes.medium)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, style = MaterialTheme.typography.titleLarge, color = tint)
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                color = tint,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
             if (suffix.isNotBlank()) {
                 Text(
                     suffix,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier.padding(start = 2.dp, bottom = 3.dp)
                 )
             }
@@ -558,7 +659,6 @@ fun ConfirmDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateField(
     label: String,
@@ -582,27 +682,102 @@ fun DateField(
         }
     }
     if (showPicker) {
-        val initial = DateUtils.parse(isoDate)
-            ?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
-        val state = rememberDatePickerState(initialSelectedDateMillis = initial)
-        DatePickerDialog(
+        val english = com.mindtrace.app.ui.i18n.LocalAppLanguage.current.isEnglish
+        val today = DateUtils.today()
+        val selected = DateUtils.parse(isoDate) ?: today
+        var pickerYear by remember(showPicker) { mutableIntStateOf(selected.year) }
+        var pickerMonth by remember(showPicker) { mutableIntStateOf(selected.monthValue) }
+        var picked by remember(showPicker) { mutableStateOf(DateUtils.iso(selected)) }
+        AlertDialog(
             onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val millis = state.selectedDateMillis
-                    if (millis != null) {
-                        val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                        onDateChange(DateUtils.iso(date))
+            title = { Text(if (english) "Select date" else "选择日期") },
+            text = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = {
+                            if (pickerMonth == 1) { pickerYear -= 1; pickerMonth = 12 } else pickerMonth -= 1
+                        }) { Icon(Icons.Rounded.ChevronLeft, contentDescription = "上个月") }
+                        Text(
+                            DateUtils.monthLabel(pickerYear, pickerMonth),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center
+                        )
+                        IconButton(onClick = {
+                            if (pickerMonth == 12) { pickerYear += 1; pickerMonth = 1 } else pickerMonth += 1
+                        }) { Icon(Icons.Rounded.ChevronRight, contentDescription = "下个月") }
                     }
-                    showPicker = false
-                }) { Text("确定") }
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth()) {
+                        DateUtils.weekdayHeaders().forEach { text ->
+                            Text(
+                                text,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    val first = java.time.LocalDate.of(pickerYear, pickerMonth, 1)
+                    val cells = buildList<java.time.LocalDate?> {
+                        repeat(first.dayOfWeek.value - 1) { add(null) }
+                        for (day in 1..first.lengthOfMonth()) {
+                            add(java.time.LocalDate.of(pickerYear, pickerMonth, day))
+                        }
+                        while (size % 7 != 0) add(null)
+                    }
+                    cells.chunked(7).forEach { week ->
+                        Row(Modifier.fillMaxWidth()) {
+                            week.forEach { date ->
+                                Box(
+                                    Modifier.weight(1f).aspectRatio(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (date != null) {
+                                        val iso = DateUtils.iso(date)
+                                        val future = date.isAfter(today)
+                                        val isPicked = iso == picked
+                                        Box(
+                                            Modifier
+                                                .fillMaxSize()
+                                                .padding(2.dp)
+                                                .background(
+                                                    if (isPicked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                    RoundedCornerShape(10.dp)
+                                                )
+                                                .clickable(enabled = !future) { picked = iso },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                date.dayOfMonth.toString(),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = when {
+                                                    isPicked -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                    future -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                    else -> MaterialTheme.colorScheme.onSurface
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onDateChange(picked); showPicker = false }) {
+                    Text(if (english) "OK" else "确定")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showPicker = false }) { Text("取消") }
+                TextButton(onClick = { showPicker = false }) {
+                    Text(if (english) "Cancel" else "取消")
+                }
             }
-        ) {
-            DatePicker(state = state)
-        }
+        )
     }
 }
 

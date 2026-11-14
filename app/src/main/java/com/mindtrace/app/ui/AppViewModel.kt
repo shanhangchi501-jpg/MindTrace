@@ -64,6 +64,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val allMedications: StateFlow<List<MedicationEntity>> = container.medicationRepository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 补记页当前选中的日期；切换日期时自动重新读取这一天的服药记录。 */
+    val backfillDate = MutableStateFlow(DateUtils.todayIso())
+    val backfillLogs = backfillDate.flatMapLatest { date ->
+        container.medicationRepository.observeLogsForDate(date)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val scales: StateFlow<List<ScaleAssessmentEntity>> = container.scaleRepository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -264,6 +270,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setBackfillDate(date: String) {
+        backfillDate.value = date
+    }
+
+    /** 补记 / 修正历史服药数据：直接修改该日期的记录，不新增数据段、不做补记标记。 */
+    fun setDoseRecord(medicationId: Long, date: String, time: String, taken: Boolean, takenAt: Long) {
+        viewModelScope.launch {
+            container.medicationRepository.setDoseRecord(medicationId, date, time, taken, takenAt)
+        }
+    }
+
     suspend fun dosesFor(date: String): List<DoseSlot> {
         val meds = container.medicationRepository.getActive()
         val logs = container.medicationRepository.getAllLogs().filter { it.date == date }
@@ -342,6 +359,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setDefaultReportDays(days: Int) {
         settingsStore.defaultReportDays = days
         insightsDays.value = days
+        refreshSettings()
+    }
+
+    fun setThemeColor(code: String) {
+        settingsStore.themeColor = code
+        refreshSettings()
+    }
+
+    fun markSponsorPromptShown() {
+        settingsStore.sponsorPromptShown = true
+        refreshSettings()
+    }
+
+    fun setCrisisCountry(code: String) {
+        settingsStore.crisisCountry = code
+        refreshSettings()
+    }
+
+    fun setMedicationOrder(ids: List<Long>) {
+        settingsStore.medicationOrder = ids.joinToString(",")
+        refreshSettings()
+    }
+
+    fun setThemeMode(mode: String) {
+        settingsStore.themeMode = mode
         refreshSettings()
     }
 

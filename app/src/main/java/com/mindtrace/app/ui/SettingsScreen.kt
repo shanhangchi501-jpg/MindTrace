@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
@@ -101,6 +102,7 @@ fun SettingsScreen(
     onOpenCrisis: () -> Unit = {},
     onOpenReport: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenSponsor: () -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
     onOpenReminderHelp: () -> Unit = {},
     onOpenTerms: () -> Unit = {},
@@ -319,12 +321,15 @@ fun SettingsScreen(
                             profile?.displayName?.ifBlank { "还没有填写称呼" } ?: "还没有填写称呼",
                             style = MaterialTheme.typography.titleMedium
                         )
+                        val language = com.mindtrace.app.ui.i18n.LocalAppLanguage.current
                         val conditions = profile?.conditions?.split(',')
                             ?.filter { it.isNotBlank() }
                             ?.mapNotNull { key -> SymptomCatalog.conditions.firstOrNull { it.key == key }?.label }
+                            ?.map { com.mindtrace.app.ui.i18n.translate(it, language) }
                             .orEmpty()
                         Text(
-                            conditions.joinToString("、").ifBlank { "点此填写称呼与关注方向" },
+                            conditions.joinToString(if (language.isEnglish) ", " else "、")
+                                .ifBlank { "点此填写称呼与关注方向" },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -355,6 +360,32 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(14.dp))
+                SectionTitle("外观", subtitle = "浅色 / 深色 / 跟随系统")
+                Spacer(Modifier.height(10.dp))
+                SegmentedOptions(
+                    options = listOf(
+                        "system" to "跟随系统",
+                        "light" to "浅色",
+                        "dark" to "深色"
+                    ),
+                    selected = settings.themeMode,
+                    onSelect = { viewModel.setThemeMode(it) }
+                )
+                Spacer(Modifier.height(14.dp))
+                SectionTitle("主题色", subtitle = "换一种主色，深浅模式通用")
+                Spacer(Modifier.height(10.dp))
+                SegmentedOptions(
+                    options = listOf(
+                        "sage" to "青绿",
+                        "ocean" to "海蓝",
+                        "plum" to "梅紫",
+                        "amber" to "琥珀",
+                        "rose" to "玫瑰"
+                    ),
+                    selected = settings.themeColor,
+                    onSelect = { viewModel.setThemeColor(it) }
+                )
             }
             }
         }
@@ -383,7 +414,7 @@ fun SettingsScreen(
                 SettingRow(
                     icon = Icons.Rounded.Warning,
                     title = "紧急支持",
-                    subtitle = "12356 / 120 / 110 与信任的人",
+                    subtitle = "当地紧急电话与信任的人",
                     onClick = onOpenCrisis
                 )
             }
@@ -462,15 +493,25 @@ fun SettingsScreen(
                         icon = Icons.Rounded.Notifications,
                         tint = MaterialTheme.colorScheme.secondary
                     )
-                    Row {
+                    Column {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                             !NotificationHelper.notificationPermissionGranted(context)
                         ) {
-                            TextButton(onClick = {
-                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }) { Text("请求通知权限") }
+                            TextButton(
+                                onClick = {
+                                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("请求通知权限", maxLines = 1)
+                            }
                         }
-                        TextButton(onClick = { openNotificationSettings() }) { Text("打开通知设置") }
+                        TextButton(
+                            onClick = { openNotificationSettings() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("打开通知设置", maxLines = 1)
+                        }
                     }
                 }
 
@@ -651,6 +692,12 @@ fun SettingsScreen(
                     title = "隐私说明",
                     subtitle = "无网络权限、加密存储与数据边界",
                     onClick = onOpenPrivacy
+                )
+                SettingRow(
+                    icon = Icons.Rounded.Favorite,
+                    title = "赞助与作者的话",
+                    subtitle = "支持心迹继续更新 · 作者的话",
+                    onClick = onOpenSponsor
                 )
                 SettingRow(
                     icon = Icons.Rounded.Info,

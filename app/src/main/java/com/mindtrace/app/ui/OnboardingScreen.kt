@@ -75,7 +75,7 @@ import com.mindtrace.app.ui.components.WarmBackground
 import com.mindtrace.app.ui.theme.MoodColors
 import com.mindtrace.app.work.ReminderScheduler
 
-private const val PAGE_COUNT = 4
+private const val PAGE_COUNT = 5
 
 @Composable
 fun OnboardingScreen(viewModel: AppViewModel) {
@@ -128,7 +128,8 @@ fun OnboardingScreen(viewModel: AppViewModel) {
         0 -> disclaimerAccepted
         1 -> selectedSymptoms.isNotEmpty()
         2 -> true
-        else -> !lockEnabled || pinMatches
+        3 -> !lockEnabled || pinMatches
+        else -> true
     }
 
     fun requestNotificationIfNeeded() {
@@ -232,7 +233,7 @@ fun OnboardingScreen(viewModel: AppViewModel) {
                         },
                         onMedicationReminderChange = { medicationReminderEnabled = it }
                     )
-                    else -> LockPage(
+                    3 -> LockPage(
                         lockEnabled = lockEnabled,
                         pin = pin,
                         pinConfirm = pinConfirm,
@@ -245,6 +246,7 @@ fun OnboardingScreen(viewModel: AppViewModel) {
                         onPinConfirmChange = { pinConfirm = it.filter(Char::isDigit).take(6) },
                         onBiometricChange = { biometricEnabled = it }
                     )
+                    else -> AuthorNotePage()
                 }
             }
 
@@ -632,5 +634,30 @@ private fun LockPage(
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
+    }
+}
+
+@Composable
+private fun AuthorNotePage() {
+    val english = com.mindtrace.app.ui.i18n.LocalAppLanguage.current.isEnglish
+    val paragraphs = if (english) AuthorNote.en else AuthorNote.zh
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 22.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("作者的话", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (english) "Why MindTrace exists" else "读一读作者为什么做心迹",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        items(paragraphs.size) { index ->
+            Text(paragraphs[index], style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }

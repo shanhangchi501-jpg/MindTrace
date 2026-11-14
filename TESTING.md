@@ -1,13 +1,13 @@
-# 心迹 0.3.0 测试清单
+# 心迹 0.4.0 测试清单
 
 当前测试包：
 
-- Debug：`dist/MindTrace-0.3.0-debug.apk`，包名 `com.mindtrace.app.debug`
-- Release：`dist/MindTrace-0.3.0-release.apk`，包名 `com.mindtrace.app`
+- Debug：`dist/MindTrace-0.4.0-debug.apk`，包名 `com.mindtrace.app.debug`
+- Release：`dist/MindTrace-0.4.0-release.apk`，包名 `com.mindtrace.app`
 
 模拟器 AVD：`inner_isle_test`
 
-测试数据集：`dist/MindTrace-0.3.0-schizophrenia-demo.mtrbackup`，密码 `MindTraceTest2026`。说明、预期结果与已执行验证见 `dist/MindTrace-0.3.0-test-dataset.md`。
+测试数据集：`dist/MindTrace-Demo-Dataset.mtbackup`，密码 `mindtrace-demo`；内容为 30 天打卡、3 种药物、5 份量表、4 篇日记与安全计划。
 
 ## 清空数据、重新开始
 
@@ -204,7 +204,7 @@ adb shell pm clear com.mindtrace.app.debug
 - [ ] 中文 PDF 与英文 PDF 均无乱码或截断
 
 ### T. 演示备份（0.2.0 更新）
-- [ ] 导入 `MindTrace-0.2.0-demo-backup.mtrbackup`，密码 `MindTraceTest2026`
+- [ ] 导入 `MindTrace-0.2.0-demo-backup.mtrbackup`，密码 `mindtrace-demo`
 - [ ] 恢复后首页显示「林晚」，有约 30 天记录
 - [ ] 药物页有 3 种药物，按需药物显示今日已记录次数
 - [ ] 量表页有 8 条历史测评
@@ -263,9 +263,9 @@ adb shell pm clear com.mindtrace.app.debug
 - [ ] 第 2 页的用药、自评量表、安全记录与说明不被裁切
 - [ ] 诊断记录压缩为一条一行，名称、标准、日期、医生与状态同排显示
 - [ ] 用药与自评量表并列为左右两栏，各保留最近 3 项，并显示「另有 N 项」
-- [ ] 使用 0.3.0 测试数据集恢复后，摘要版为 1 页并包含 11 张症状图
+- [ ] 使用 0.4.0 测试数据集恢复后，摘要版为 1 页并包含 11 张症状图
 
-### Z. 医生详细版 PDF（0.3.0 新增）
+### Z. 医生详细版 PDF（0.4.0 新增）
 - [ ] 报告版本选择「医生详细版」后，预览、保存和分享都使用详细版
 - [ ] 第 1 页包含基本信息、记录完整性、摘要、诊断、目前用药、安全记录与医生问题
 - [ ] 第 2 页包含症状概览表、用药明细、自评量表与报告说明

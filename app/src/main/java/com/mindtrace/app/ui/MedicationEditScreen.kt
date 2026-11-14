@@ -1,5 +1,6 @@
 package com.mindtrace.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -17,12 +19,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -36,12 +40,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mindtrace.app.data.DateUtils
 import com.mindtrace.app.data.MedicationEntity
+import com.mindtrace.app.data.displayName
 import com.mindtrace.app.ui.components.ConfirmDialog
 import com.mindtrace.app.ui.components.DateField
 import com.mindtrace.app.ui.components.InfoBanner
@@ -81,7 +87,7 @@ fun MedicationEditScreen(
 
     LaunchedEffect(existing) {
         if (!initialized && existing != null && medicationId > 0) {
-            name = existing.name
+            name = existing.displayName()
             dosage = existing.dosage
             unit = existing.unit
             times = existing.times.split(',').filter { it.isNotBlank() }.ifEmpty { listOf("08:00") }
@@ -137,14 +143,53 @@ fun MedicationEditScreen(
         ) {
             item {
                 SoftCard {
+                    val uiLanguage = com.mindtrace.app.ui.i18n.LocalAppLanguage.current
+                    val englishUi = uiLanguage.isEnglish
+                    var nameFocused by remember { mutableStateOf(false) }
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("药物名称 *") },
-                        placeholder = { Text("例如：舍曲林") },
+                        label = { Text(if (englishUi) "Medication name *" else "药物名称 *") },
+                        placeholder = { Text(if (englishUi) "e.g. Sertraline" else "例如：舍曲林") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { nameFocused = it.isFocused }
                     )
+                    val presets = remember(name, englishUi) {
+                        com.mindtrace.app.data.MedicationPresets.suggestions(name, englishUi)
+                    }
+                    if (nameFocused && name.isNotBlank() && presets.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            tonalElevation = 3.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 260.dp)
+                        ) {
+                            LazyColumn {
+                                items(presets, key = { it.zh }) { preset ->
+                                    val label = if (englishUi) preset.en else preset.zh
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                name = label
+                                                nameFocused = false
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            label,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(
@@ -208,7 +253,12 @@ fun MedicationEditScreen(
                         }
                         TextButton(
                             onClick = {
-                                if (times.size < 6) times = (times + "20:00").distinct()
+                                val used = times.toSet()
+                                val candidate = listOf(
+                                    "08:00", "12:00", "20:00", "10:00", "14:00",
+                                    "18:00", "22:00", "06:00", "09:00", "16:00", "23:00"
+                                ).firstOrNull { it !in used } ?: "20:00"
+                                times = times + candidate
                             },
                             contentPadding = PaddingValues(0.dp)
                         ) {
@@ -316,7 +366,7 @@ fun MedicationEditScreen(
     if (showDelete && existing != null) {
         ConfirmDialog(
             title = "删除这条药物记录？",
-            text = "对应的服药记录也会一起删除，无法恢复。若只是停药，建议关闭「仍在服用」而不是删除。",
+            text = "药物会从在服列表移除，但历史服药记录会保留，可在「药物 → 补记 → 这一天的服药记录」里查看或逐条删除；依从率只统计仍在服的药物。若只是停药，建议关闭「仍在服用」而不是删除。",
             confirmLabel = "删除",
             destructive = true,
             onConfirm = {

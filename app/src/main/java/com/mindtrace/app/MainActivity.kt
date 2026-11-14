@@ -7,6 +7,7 @@ import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -37,7 +38,12 @@ class MainActivity : FragmentActivity() {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val language = AppLocale.fromCode(settings.language)
             CompositionLocalProvider(LocalAppLanguage provides language) {
-                MindTraceTheme {
+                val darkTheme = when (settings.themeMode) {
+                    "dark" -> true
+                    "light" -> false
+                    else -> isSystemInDarkTheme()
+                }
+                MindTraceTheme(darkTheme = darkTheme, colorTheme = settings.themeColor) {
                     SecureScreen(enabled = settings.preventScreenshots)
                     when {
                         !settings.onboardingComplete -> OnboardingScreen(viewModel)

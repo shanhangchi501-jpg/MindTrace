@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import com.mindtrace.app.ui.i18n.LocalAppLanguage
 import com.mindtrace.app.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -45,7 +46,9 @@ fun LineTrendChart(
     chartHeight: Int = 150
 ) {
     val values = points.mapNotNull { it.value }
-    val description = if (values.isEmpty()) "暂无数据" else "趋势图，共 ${values.size} 个数据点"
+    val english = LocalAppLanguage.current.isEnglish
+    val emptyLabel = if (english) "No data yet" else "暂无数据"
+    val description = if (values.isEmpty()) emptyLabel else "趋势图，共 ${values.size} 个数据点"
     Column(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.Top) {
             Column(
@@ -91,7 +94,7 @@ fun LineTrendChart(
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
                     drawContext.canvas.nativeCanvas.drawText(
-                        "暂无数据",
+                        emptyLabel,
                         size.width / 2f,
                         size.height / 2f,
                         textPaint

@@ -26,7 +26,13 @@ data class UiSettings(
     val hasPin: Boolean = false,
     val hasAnyUnlock: Boolean = false,
     val defaultReportDays: Int = 30,
-    val language: String = "system"
+    val language: String = "system",
+    val themeMode: String = "system",
+    val themeColor: String = "sage",
+    val medicationOrder: String = "",
+    val crisisCountry: String = "CN",
+    val sponsorPromptShown: Boolean = false,
+    val appLaunchCount: Int = 0
 )
 
 class SettingsStore(context: Context) {
@@ -98,6 +104,33 @@ class SettingsStore(context: Context) {
 
     fun resolvedLanguage(): AppLanguage = AppLocale.fromCode(language)
 
+    /** 主题：system / light / dark。 */
+    var themeMode: String
+        get() = sp.getString("theme_mode", "system") ?: "system"
+        set(value) = sp.edit().putString("theme_mode", value).apply()
+
+    /** 主题色系：sage / ocean / plum / amber / rose。 */
+    var themeColor: String
+        get() = sp.getString("theme_color", "sage") ?: "sage"
+        set(value) = sp.edit().putString("theme_color", value).apply()
+
+    /** 在服药物的自定义顺序，逗号分隔的 id。 */
+    var crisisCountry: String
+        get() = sp.getString("crisis_country", "CN") ?: "CN"
+        set(value) = sp.edit().putString("crisis_country", value).apply()
+
+    var appLaunchCount: Int
+        get() = sp.getInt("app_launch_count", 0)
+        set(value) = sp.edit().putInt("app_launch_count", value).apply()
+
+    var sponsorPromptShown: Boolean
+        get() = sp.getBoolean("sponsor_prompt_shown", false)
+        set(value) = sp.edit().putBoolean("sponsor_prompt_shown", value).apply()
+
+    var medicationOrder: String
+        get() = sp.getString("medication_order", "") ?: ""
+        set(value) = sp.edit().putString("medication_order", value).apply()
+
     val hasPin: Boolean
         get() = !sp.getString("pin_hash", null).isNullOrBlank()
 
@@ -119,7 +152,13 @@ class SettingsStore(context: Context) {
         hasPin = hasPin,
         hasAnyUnlock = hasAnyUnlock,
         defaultReportDays = defaultReportDays,
-        language = language
+        language = language,
+        themeMode = themeMode,
+        themeColor = themeColor,
+        medicationOrder = medicationOrder,
+        crisisCountry = crisisCountry,
+        sponsorPromptShown = sponsorPromptShown,
+        appLaunchCount = appLaunchCount
     )
 
     fun setPin(pin: String) {
