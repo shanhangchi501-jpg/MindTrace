@@ -28,7 +28,7 @@
 | --- | --- | --- |
 | ![深色趋势](docs/screenshots/13-trends-dark.png) | ![PDF 1](docs/screenshots/14-pdf-page1.png) | ![PDF 2](docs/screenshots/15-pdf-page2.png) |
 
-## 已实现（0.4.0 正式版）
+## 已实现（0.4.1 正式版）
 
 - 首次引导：医疗免责声明、病种/症状选择、提醒设置、可选应用锁
 - **5 个底部标签**：今天、药物、趋势、科普、我的；页面常驻组合，切换无闪烁且保留滚动位置
@@ -120,14 +120,16 @@ keyPassword=...
 
 ## 发布产物
 
-APK、示例 PDF、测试数据集与 SHA-256 见 [GitHub Releases](../../releases/latest)，不纳入 Git 历史（本地 `dist/` 已 gitignore）。
+APK、示例 PDF、测试数据集与 SHA-256 见 [GitHub Releases](https://github.com/shanhangchi501-jpg/MindTrace/releases/latest)，不纳入 Git 历史（本地 `dist/` 已 gitignore）。
+
+最新版本：[v0.4.1](https://github.com/shanhangchi501-jpg/MindTrace/releases/tag/v0.4.1)
 
 0.4.1 Release APK SHA-256：`b07bc7530262af166d1b7f5df165f077f10a9de1754f9bfd2e3882f539e41170`
 
 ### 宣传 / 演示素材
 
 - 演示数据集：`MindTrace-Demo-Dataset.mtbackup`（密码 `mindtrace-demo`），导入后得到 30 天打卡、3 种药物、62 条服药记录、5 份量表、4 篇日记、安全计划与 2 条诊断
-- 使用 0.4.0 正式版安装后，在「我的 → 设置 → 数据与报告 → 从备份恢复」选择该文件即可
+- 使用 0.4.1 正式版安装后，在「我的 → 设置 → 数据与报告 → 从备份恢复」选择该文件即可
 - 截图与 PDF 示例见 [docs/screenshots](docs/screenshots)
 
 ## 目录
@@ -157,7 +159,7 @@ app/src/main/java/com/mindtrace/app/
 
 ## 测试
 
-当前版本为 `0.4.0`，为正式签名版本。测试清单见 [TESTING.md](TESTING.md)，安装与使用说明见 [USER_GUIDE.md](USER_GUIDE.md)。
+当前版本为 `0.4.1`，为正式签名版本。测试清单见 [TESTING.md](TESTING.md)，安装与使用说明见 [USER_GUIDE.md](USER_GUIDE.md)。
 
 提醒功能声明了 `USE_EXACT_ALARM`（Android 13+ 自动授予），以保证每日记录和用药提醒准时触发。如果未来上架 Google Play，需要重新评估该权限的政策适用性；侧载版本不受此限制。
 
@@ -167,7 +169,7 @@ app/src/main/java/com/mindtrace/app/
 - [PRIVACY.md](PRIVACY.md)：权限、数据范围与隐私说明
 - [TESTING.md](TESTING.md)：功能测试清单
 - [CHANGELOG.md](CHANGELOG.md)：版本变更
-- [RELEASE_NOTES.md](RELEASE_NOTES.md)：0.4.0 发布说明（中英）
+- [RELEASE_NOTES.md](RELEASE_NOTES.md)：0.4.1 发布说明（中英）
 
 ## License
 
