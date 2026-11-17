@@ -251,7 +251,8 @@ fun MainApp(
                     InsightsScreen(
                         viewModel = viewModel,
                         onOpenScales = { navController.navigate(Routes.SCALES) },
-                        onOpenReport = { navController.navigate(Routes.REPORT) }
+                        onOpenReport = { navController.navigate(Routes.REPORT) },
+                        onOpenBackfill = { navController.navigate(Routes.MED_BACKFILL) }
                     )
                 }
                 PersistentTab(visible = currentRoute == Routes.LEARN) {

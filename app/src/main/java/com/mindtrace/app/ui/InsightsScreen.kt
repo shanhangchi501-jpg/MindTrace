@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Assignment
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,7 +64,8 @@ import java.util.Locale
 fun InsightsScreen(
     viewModel: AppViewModel,
     onOpenScales: () -> Unit,
-    onOpenReport: () -> Unit
+    onOpenReport: () -> Unit,
+    onOpenBackfill: () -> Unit
 ) {
     val days by viewModel.insightsDays.collectAsStateWithLifecycle()
     val checkIns by viewModel.insightsCheckIns.collectAsStateWithLifecycle()
@@ -148,13 +150,19 @@ fun InsightsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Column {
-                Text("趋势", style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    "看见变化，而不是审判自己。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("趋势", style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        "看见变化，而不是审判自己。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                TextButton(onClick = onOpenBackfill) {
+                    Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.width(18.dp))
+                    Text("  补记")
+                }
             }
         }
         item {

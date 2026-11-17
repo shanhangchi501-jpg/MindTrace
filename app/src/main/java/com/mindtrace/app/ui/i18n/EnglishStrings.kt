@@ -836,7 +836,7 @@ internal object EnglishStrings {
         put("  情绪记录", "  Mood")
         put("  日记", "  Journal")
         put("  编辑", "  Edit")
-        put("  补记", "  Add")
+        put("  补记", "  Backfill")
         put("不记得也没关系。可以从今天重新开始。", "It's okay if you don't remember. You can start again today.")
         put("有些感受不适合填进选项里。可以在这里慢慢写。", "Some feelings don't fit into options. You can write them here.")
         put("一件小事", "A small thing")
