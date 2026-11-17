@@ -13,6 +13,19 @@
 - **AUDIT-C** — Bush 等 / World Health Organization。非商业使用请保留来源说明。
 - **ASRS-5** — World Health Organization / Ustun 等。非商业使用请保留来源说明。
 - **SCOFF** — Morgan, Reid & Lacey。临床与研究常用，请保留来源说明。
+- **PSS-10** — Cohen, Kamarck & Mermelstein (1983)。研究与教育用途可免费使用；商业使用请先确认授权。
+- **STOP-BANG** — Chung 等 (2008)。可免费用于筛查。
+- **AUDIT** — World Health Organization（Babor 等, 2001）。公共卫生筛查工具，可免费使用。
+- **FTND** — Heatherton 等 (1991)。研究与临床常用，请保留来源。
+- **UCLA-3** — Hughes 等 (2004)。可免费用于研究与临床。
+- **WSAS** — Mundt 等 (2002)。可免费用于研究与临床。
+- **SWLS** — Diener 等 (1985)。可免费用于研究与临床。
+- **K10** — Kessler 等 / World Health Organization。非商业使用请保留来源。
+- **EAT-26** — Garner 等 (1982)。临床与研究使用请保留来源；商业使用请先确认授权。
+- **PGSI** — Ferris & Wynne (2001)。非商业筛查可免费使用。
+- **CRAFFT** — Knight 等 (1999, 2002)。临床与研究使用请保留来源。
+- **DES-II** — Carlson & Putnam (1993)。临床与研究可免费使用并需保留来源；商业分发请先取得作者许可。
+- **ASQ** — NIMH / Horowitz 等 (2012)。可免费用于临床与研究筛查。
 
 ### 需要确认电子版/再分发条款的量表
 
@@ -30,6 +43,8 @@
 - **Rosenberg Self-Esteem Scale** — Morris Rosenberg（1965）
 - **AQ-10** — Allison, Auyeung & Baron-Cohen（2012）
 - **ITQ** — Cloitre 等 / International Trauma Consortium
+- **MID-60（多维解离量表简版）** — Paul Dell 等。商业或电子版再分发需授权，**未内置**。
+- **SCL-90** — Derogatis / Pearson。属于商业授权量表，**未内置**（可用 K10、PHQ-15、DASS-21 等免费工具替代）。
 
 ### 简化版本说明
 
