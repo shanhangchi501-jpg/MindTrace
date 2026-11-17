@@ -14,7 +14,7 @@
 
 ### 产物
 - versionCode 18 / versionName 0.4.3
-- APK SHA-256：@83640f6fdcba489f6691b2ca51c9258abc3d7df8dce178de423144a12ddbc2c7`
+- APK SHA-256：`83640f6fdcba489f6691b2ca51c9258abc3d7df8dce178de423144a12ddbc2c7`
 
 ## 0.4.2 — 2026-11-17
 
