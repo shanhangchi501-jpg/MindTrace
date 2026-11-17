@@ -66,7 +66,8 @@ fun InsightsScreen(
     viewModel: AppViewModel,
     onOpenScales: () -> Unit,
     onOpenReport: () -> Unit,
-    onBackdatedCheckIn: (String) -> Unit
+    onBackdatedCheckIn: (String) -> Unit,
+    onOpenScaleHistory: () -> Unit
 ) {
     val days by viewModel.insightsDays.collectAsStateWithLifecycle()
     val checkIns by viewModel.insightsCheckIns.collectAsStateWithLifecycle()
@@ -372,7 +373,7 @@ fun InsightsScreen(
         }
 
         item {
-            ScaleSummaryCard(scales = scales, onClick = onOpenScales)
+            ScaleSummaryCard(scales = scales, onClick = onOpenScales, onOpenHistory = onOpenScaleHistory)
         }
 
         item {
@@ -408,7 +409,11 @@ fun InsightsScreen(
 }
 
 @Composable
-private fun ScaleSummaryCard(scales: List<ScaleAssessmentEntity>, onClick: () -> Unit) {
+private fun ScaleSummaryCard(
+    scales: List<ScaleAssessmentEntity>,
+    onClick: () -> Unit,
+    onOpenHistory: () -> Unit
+) {
     val english = LocalAppLanguage.current.isEnglish
     val latest = ScaleCatalog.all.mapNotNull { def ->
         scales.firstOrNull { it.type == def.type }?.let { def to it }
@@ -423,6 +428,7 @@ private fun ScaleSummaryCard(scales: List<ScaleAssessmentEntity>, onClick: () ->
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            TextButton(onClick = onOpenHistory) { Text("全部") }
             Icon(Icons.Rounded.Assignment, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
         }
         if (latest.isEmpty()) {

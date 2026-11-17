@@ -49,7 +49,8 @@ fun ScalesScreen(
     viewModel: AppViewModel,
     onBack: () -> Unit,
     onStartScale: (String) -> Unit,
-    onOpenAllScales: () -> Unit
+    onOpenAllScales: () -> Unit,
+    onOpenHistory: () -> Unit
 ) {
     val scales by viewModel.scales.collectAsStateWithLifecycle()
     val english = LocalAppLanguage.current.isEnglish
@@ -129,7 +130,13 @@ fun ScalesScreen(
         }
         if (scales.isNotEmpty()) {
             item {
-                SectionTitle("最近测评", subtitle = "可以删除不需要的记录")
+                SectionTitle(
+                    "最近测评",
+                    subtitle = "可以删除不需要的记录",
+                    action = {
+                        TextButton(onClick = onOpenHistory) { Text("全部") }
+                    }
+                )
             }
             items(scales.take(8), key = { "history-${it.id}" }) { item ->
                 RecentScaleRow(

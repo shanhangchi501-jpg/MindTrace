@@ -59,6 +59,7 @@ private object Routes {
     const val JOURNAL_EDIT = "journal_edit/{journalId}/{date}"
     const val MED_EDIT = "med_edit/{medId}"
     const val MED_BACKFILL = "med_backfill"
+    const val SCALE_HISTORY = "scale_history"
     const val SCALES = "scales"
     const val SCALES_ALL = "scales_all"
     const val SCALE = "scale/{type}"
@@ -252,7 +253,8 @@ fun MainApp(
                         viewModel = viewModel,
                         onOpenScales = { navController.navigate(Routes.SCALES) },
                         onOpenReport = { navController.navigate(Routes.REPORT) },
-                        onBackdatedCheckIn = { date -> navController.navigate("checkin/$date") }
+                        onBackdatedCheckIn = { date -> navController.navigate("checkin/$date") },
+                        onOpenScaleHistory = { navController.navigate(Routes.SCALE_HISTORY) }
                     )
                 }
                 PersistentTab(visible = currentRoute == Routes.LEARN) {
@@ -368,12 +370,20 @@ fun MainApp(
                     )
                 }
 
+                composable(Routes.SCALE_HISTORY) {
+                    ScaleHistoryScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
                 composable(Routes.SCALES) {
                     ScalesScreen(
                         viewModel = viewModel,
                         onBack = { navController.popBackStack() },
                         onStartScale = { type -> navController.navigate("scale/$type") },
-                        onOpenAllScales = { navController.navigate(Routes.SCALES_ALL) }
+                        onOpenAllScales = { navController.navigate(Routes.SCALES_ALL) },
+                        onOpenHistory = { navController.navigate(Routes.SCALE_HISTORY) }
                     )
                 }
 
