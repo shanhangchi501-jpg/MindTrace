@@ -24,8 +24,8 @@ android {
         applicationId = "com.mindtrace.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.4.2"
+        versionCode = 18
+        versionName = "0.4.3"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
