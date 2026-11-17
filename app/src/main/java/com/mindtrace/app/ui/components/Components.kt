@@ -682,103 +682,117 @@ fun DateField(
         }
     }
     if (showPicker) {
-        val english = com.mindtrace.app.ui.i18n.LocalAppLanguage.current.isEnglish
-        val today = DateUtils.today()
-        val selected = DateUtils.parse(isoDate) ?: today
-        var pickerYear by remember(showPicker) { mutableIntStateOf(selected.year) }
-        var pickerMonth by remember(showPicker) { mutableIntStateOf(selected.monthValue) }
-        var picked by remember(showPicker) { mutableStateOf(DateUtils.iso(selected)) }
-        AlertDialog(
-            onDismissRequest = { showPicker = false },
-            title = { Text(if (english) "Select date" else "选择日期") },
-            text = {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = {
-                            if (pickerMonth == 1) { pickerYear -= 1; pickerMonth = 12 } else pickerMonth -= 1
-                        }) { Icon(Icons.Rounded.ChevronLeft, contentDescription = "上个月") }
+        SimpleDatePickerDialog(
+            initialIso = isoDate,
+            onDismiss = { showPicker = false },
+            onPick = {
+                onDateChange(it)
+                showPicker = false
+            }
+        )
+    }
+}
+
+/** 应用内自绘日期选择器，跟随界面语言，只允许选择 maxIso 及之前的日期。 */
+@Composable
+fun SimpleDatePickerDialog(
+    initialIso: String,
+    maxIso: String = DateUtils.todayIso(),
+    title: String = "选择日期",
+    onDismiss: () -> Unit,
+    onPick: (String) -> Unit
+) {
+    val maxDate = DateUtils.parse(maxIso) ?: DateUtils.today()
+    val selected = DateUtils.parse(initialIso) ?: maxDate
+    var pickerYear by remember { mutableIntStateOf(selected.year) }
+    var pickerMonth by remember { mutableIntStateOf(selected.monthValue) }
+    var picked by remember { mutableStateOf(DateUtils.iso(selected)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = {
+                        if (pickerMonth == 1) { pickerYear -= 1; pickerMonth = 12 } else pickerMonth -= 1
+                    }) { Icon(Icons.Rounded.ChevronLeft, contentDescription = "上个月") }
+                    Text(
+                        DateUtils.monthLabel(pickerYear, pickerMonth),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center
+                    )
+                    IconButton(onClick = {
+                        if (pickerMonth == 12) { pickerYear += 1; pickerMonth = 1 } else pickerMonth += 1
+                    }) { Icon(Icons.Rounded.ChevronRight, contentDescription = "下个月") }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth()) {
+                    DateUtils.weekdayHeaders().forEach { text ->
                         Text(
-                            DateUtils.monthLabel(pickerYear, pickerMonth),
-                            style = MaterialTheme.typography.titleMedium,
+                            text,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f),
                             textAlign = TextAlign.Center
                         )
-                        IconButton(onClick = {
-                            if (pickerMonth == 12) { pickerYear += 1; pickerMonth = 1 } else pickerMonth += 1
-                        }) { Icon(Icons.Rounded.ChevronRight, contentDescription = "下个月") }
                     }
-                    Spacer(Modifier.height(6.dp))
+                }
+                Spacer(Modifier.height(4.dp))
+                val first = java.time.LocalDate.of(pickerYear, pickerMonth, 1)
+                val cells = buildList<java.time.LocalDate?> {
+                    repeat(first.dayOfWeek.value - 1) { add(null) }
+                    for (day in 1..first.lengthOfMonth()) {
+                        add(java.time.LocalDate.of(pickerYear, pickerMonth, day))
+                    }
+                    while (size % 7 != 0) add(null)
+                }
+                cells.chunked(7).forEach { week ->
                     Row(Modifier.fillMaxWidth()) {
-                        DateUtils.weekdayHeaders().forEach { text ->
-                            Text(
-                                text,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    val first = java.time.LocalDate.of(pickerYear, pickerMonth, 1)
-                    val cells = buildList<java.time.LocalDate?> {
-                        repeat(first.dayOfWeek.value - 1) { add(null) }
-                        for (day in 1..first.lengthOfMonth()) {
-                            add(java.time.LocalDate.of(pickerYear, pickerMonth, day))
-                        }
-                        while (size % 7 != 0) add(null)
-                    }
-                    cells.chunked(7).forEach { week ->
-                        Row(Modifier.fillMaxWidth()) {
-                            week.forEach { date ->
-                                Box(
-                                    Modifier.weight(1f).aspectRatio(1f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (date != null) {
-                                        val iso = DateUtils.iso(date)
-                                        val future = date.isAfter(today)
-                                        val isPicked = iso == picked
-                                        Box(
-                                            Modifier
-                                                .fillMaxSize()
-                                                .padding(2.dp)
-                                                .background(
-                                                    if (isPicked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                                    RoundedCornerShape(10.dp)
-                                                )
-                                                .clickable(enabled = !future) { picked = iso },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                date.dayOfMonth.toString(),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = when {
-                                                    isPicked -> MaterialTheme.colorScheme.onPrimaryContainer
-                                                    future -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                                    else -> MaterialTheme.colorScheme.onSurface
-                                                }
+                        week.forEach { date ->
+                            Box(
+                                Modifier.weight(1f).aspectRatio(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (date != null) {
+                                    val iso = DateUtils.iso(date)
+                                    val future = date.isAfter(maxDate)
+                                    val isPicked = iso == picked
+                                    Box(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .padding(2.dp)
+                                            .background(
+                                                if (isPicked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                RoundedCornerShape(10.dp)
                                             )
-                                        }
+                                            .clickable(enabled = !future) { picked = iso },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            date.dayOfMonth.toString(),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = when {
+                                                isPicked -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                future -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                else -> MaterialTheme.colorScheme.onSurface
+                                            }
+                                        )
                                     }
                                 }
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { onDateChange(picked); showPicker = false }) {
-                    Text(if (english) "OK" else "确定")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPicker = false }) {
-                    Text(if (english) "Cancel" else "取消")
-                }
             }
-        )
-    }
+        },
+        confirmButton = {
+            TextButton(onClick = { onPick(picked) }) { Text("确定") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

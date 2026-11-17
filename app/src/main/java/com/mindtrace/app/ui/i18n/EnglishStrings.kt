@@ -120,6 +120,8 @@ internal object EnglishStrings {
         // ---------- 补记服药 ----------
         put("补记", "Backfill")
         put("补记服药", "Backfill doses")
+        put("补记状态", "Backfill check-in")
+        put("  补记状态", "  Backfill")
         put("选择日期，直接修改那天的服药记录", "Pick a date and edit that day's medication logs")
         put("不能补记未来的日期", "Cannot backfill a future date")
         put("这一天没有需要按时服用的药物", "No scheduled medication for this day")

@@ -252,7 +252,7 @@ fun MainApp(
                         viewModel = viewModel,
                         onOpenScales = { navController.navigate(Routes.SCALES) },
                         onOpenReport = { navController.navigate(Routes.REPORT) },
-                        onOpenBackfill = { navController.navigate(Routes.MED_BACKFILL) }
+                        onBackdatedCheckIn = { date -> navController.navigate("checkin/$date") }
                     )
                 }
                 PersistentTab(visible = currentRoute == Routes.LEARN) {

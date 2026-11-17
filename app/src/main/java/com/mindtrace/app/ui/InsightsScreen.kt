@@ -56,6 +56,7 @@ import com.mindtrace.app.ui.components.LineTrendChart
 import com.mindtrace.app.ui.components.MetricTile
 import com.mindtrace.app.ui.components.Pill
 import com.mindtrace.app.ui.components.SectionTitle
+import com.mindtrace.app.ui.components.SimpleDatePickerDialog
 import com.mindtrace.app.ui.components.SegmentedOptions
 import com.mindtrace.app.ui.components.SoftCard
 import java.util.Locale
@@ -65,7 +66,7 @@ fun InsightsScreen(
     viewModel: AppViewModel,
     onOpenScales: () -> Unit,
     onOpenReport: () -> Unit,
-    onOpenBackfill: () -> Unit
+    onBackdatedCheckIn: (String) -> Unit
 ) {
     val days by viewModel.insightsDays.collectAsStateWithLifecycle()
     val checkIns by viewModel.insightsCheckIns.collectAsStateWithLifecycle()
@@ -150,6 +151,7 @@ fun InsightsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
+            var showStatusPicker by remember { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("趋势", style = MaterialTheme.typography.headlineMedium)
@@ -159,10 +161,21 @@ fun InsightsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                TextButton(onClick = onOpenBackfill) {
+                TextButton(onClick = { showStatusPicker = true }) {
                     Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.width(18.dp))
-                    Text("  补记")
+                    Text("  补记状态")
                 }
+            }
+            if (showStatusPicker) {
+                SimpleDatePickerDialog(
+                    initialIso = DateUtils.todayIso(),
+                    title = "补记状态",
+                    onDismiss = { showStatusPicker = false },
+                    onPick = { date ->
+                        showStatusPicker = false
+                        onBackdatedCheckIn(date)
+                    }
+                )
             }
         }
         item {
