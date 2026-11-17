@@ -266,16 +266,55 @@ private fun ResultContent(
         item {
             SoftCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "${result.score}",
-                        style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Normal),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        if (english) "Out of ${def?.maxScore ?: "?"}" else "满分 ${def?.maxScore ?: "?"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (defType == "ASRS18") {
+                        val inattention = (0..8).count { (answers.getOrNull(it) ?: 0) >= 3 }
+                        val hyperactivity = (9..17).count { (answers.getOrNull(it) ?: 0) >= 3 }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "$inattention",
+                                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Normal),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    if (english) "Inattention" else "注意力不集中",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "$hyperactivity",
+                                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Normal),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    if (english) "Hyperactivity / impulsivity" else "冲动 / 多动",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Text(
+                            if (english) "Symptoms out of 9 in each domain" else "每个维度满分 9（只计「经常 / 非常频繁」）",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            "${result.score}",
+                            style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Normal),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            if (english) "Out of ${def?.maxScore ?: "?"}" else "满分 ${def?.maxScore ?: "?"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
                     Text(
                         band?.let { def?.bandLabel(it, english) } ?: result.severity,

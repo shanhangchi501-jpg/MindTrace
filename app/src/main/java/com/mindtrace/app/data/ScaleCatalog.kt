@@ -107,6 +107,17 @@ data class ScaleDef(
             bands.firstOrNull { it.key == key } ?: bands.last()
         }
         ScaleScoring.DASS21 -> severityDass21(answers)
+        ScaleScoring.ASRS18 -> {
+            val inattention = (0..8).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
+            val hyperactivity = (9..17).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
+            val key = when {
+                inattention >= 4 && hyperactivity >= 4 -> "adhd_c"
+                inattention >= 4 -> "adhd_i"
+                hyperactivity >= 4 -> "adhd_h"
+                else -> "below"
+            }
+            bands.firstOrNull { it.key == key } ?: bands.last()
+        }
         else -> severity(score(answers))
     }
 
@@ -1989,9 +2000,10 @@ object ScaleCatalog {
             q("打断或打扰别人（插话、插队）", "Interrupt or intrude on others", asrsFreq),
         ),
         bands = listOf(
-            b(0, 3, "low", "症状数较少", "Few symptoms", "「经常 / 非常频繁」的条目较少。如果仍然觉得注意力影响生活，可以和医生讨论。", "Few items were rated often or very often. If attention still affects your life, discuss it with a doctor."),
-            b(4, 6, "partial", "有部分症状", "Some symptoms", "已经有部分症状。若这些症状持续并影响工作、学习或关系，建议做进一步评估。", "Some symptoms are present. If they persist and affect work, study or relationships, consider further assessment."),
-            b(7, 18, "elevated", "症状数较多", "Many symptoms", "症状数较多。建议由专业人员评估；ADHD 诊断还需要功能受损和儿童期起病等信息，本结果不能单独作为诊断。", "Many symptoms. A professional assessment is suggested; ADHD diagnosis also needs impairment and childhood onset, so this result alone is not a diagnosis."),
+            b(0, 18, "below", "未达到常见症状阈值", "Below common symptom threshold", "两个维度都没有达到「任一维度 4 项及以上」的常见阈值。如果仍然困扰你，可以和医生讨论。", "Neither domain reached the common threshold of 4 or more symptoms. If it still troubles you, discuss it with a doctor."),
+            b(0, 18, "adhd_i", "可能为注意力缺陷为主型（ADHD-I）", "Possible predominantly inattentive presentation (ADHD-I)", "注意力不集中维度达到 4 项及以上，冲动/多动维度未达到。建议由专业人员进一步评估；这不是诊断。", "The inattention domain reached 4 or more symptoms while hyperactivity-impulsivity did not. Further professional assessment is suggested; this is not a diagnosis."),
+            b(0, 18, "adhd_h", "可能为多动/冲动为主型（ADHD-H）", "Possible predominantly hyperactive-impulsive presentation (ADHD-H)", "冲动/多动维度达到 4 项及以上，注意力维度未达到。建议由专业人员进一步评估；这不是诊断。", "The hyperactivity-impulsivity domain reached 4 or more symptoms while inattention did not. Further professional assessment is suggested; this is not a diagnosis."),
+            b(0, 18, "adhd_c", "可能为混合型（ADHD-C）", "Possible combined presentation (ADHD-C)", "两个维度都达到 4 项及以上。建议由专业人员进一步评估；ADHD 诊断还需要功能受损与儿童期起病信息。", "Both domains reached 4 or more symptoms. Further professional assessment is suggested; ADHD diagnosis also needs impairment and childhood onset."),
         ),
         scoring = ScaleScoring.ASRS18,
         maxScoreOverride = 18,
