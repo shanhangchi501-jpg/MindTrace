@@ -11,7 +11,7 @@
 - **PCL-5 / PC-PTSD-5** — U.S. Department of Veterans Affairs, National Center for PTSD。公共领域。
 - **WHO-5 / WHODAS 2.0** — World Health Organization。可免费用于非商业目的，请保留来源说明。
 - **AUDIT-C** — Bush 等 / World Health Organization。非商业使用请保留来源说明。
-- **ASRS-5** — World Health Organization / Ustun 等。非商业使用请保留来源说明。
+- **ASRS-5 / ASRS-18** — World Health Organization / Kessler 等。非商业使用请保留来源说明。
 - **SCOFF** — Morgan, Reid & Lacey。临床与研究常用，请保留来源说明。
 - **PSS-10** — Cohen, Kamarck & Mermelstein (1983)。研究与教育用途可免费使用；商业使用请先确认授权。
 - **STOP-BANG** — Chung 等 (2008)。可免费用于筛查。

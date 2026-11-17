@@ -29,7 +29,10 @@ enum class ScaleScoring {
     DASS21,
 
     /** 取所有题目的平均值（四舍五入），用于 DES-II 这类按平均分解释的量表。 */
-    MEAN
+    MEAN,
+
+    /** ASRS-18：得分 = 评为「经常/非常频繁」的条目数（0-18）。 */
+    ASRS18
 }
 
 data class ScaleDef(
@@ -79,6 +82,9 @@ data class ScaleDef(
     fun score(answers: List<Int>): Int = when (scoring) {
         ScaleScoring.MDQ -> (0 until 13).sumOf { optionValue(it, answers.getOrElse(it) { 1 }) }
         ScaleScoring.PSQI -> psqiScore(answers)
+        ScaleScoring.ASRS18 -> answers.indices.count { index ->
+            optionValue(index, answers.getOrElse(index) { 0 }) >= 3
+        }
         ScaleScoring.MEAN -> {
             val sum = answers.indices.sumOf { index -> optionValue(index, answers.getOrElse(index) { 0 }) }
             if (questions.isEmpty()) 0 else (sum + questions.size / 2) / questions.size
@@ -153,6 +159,15 @@ data class ScaleDef(
                     "PTSD symptoms $ptsd / 24 · Disturbances in self-organisation $dso / 24 · Functional impairment $function / 24"
                 } else {
                     "PTSD 症状 $ptsd / 24 · 自我组织紊乱 $dso / 24 · 功能受损 $function / 24"
+                }
+            }
+            "ASRS18" -> {
+                val inattention = (0..8).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
+                val hyperactivity = (9..17).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
+                if (english) {
+                    "Inattention " + inattention + " / 9 · Hyperactivity-impulsivity " + hyperactivity + " / 9 · 4 or more in either domain suggests further assessment."
+                } else {
+                    "注意力 " + inattention + " / 9 · 冲动/多动 " + hyperactivity + " / 9 · 任一维度达到 4 项及以上提示需要进一步评估。"
                 }
             }
             "AUDITC" -> if (english) {
@@ -1031,13 +1046,13 @@ object ScaleCatalog {
 
     val asrs5 = ScaleDef(
         type = "ASRS5",
-        name = "成人 ADHD 自评（ASRS-5）",
+        name = "成人 ADHD 简版筛查（ASRS-5）",
         nameEn = "Adult ADHD Self-Report Screening Scale (ASRS-5)",
         shortName = "ASRS-5",
         category = "注意力与其他",
         categoryEn = "Attention & other",
-        description = "6 项成人注意力缺陷/多动筛查。",
-        descriptionEn = "A 6-item adult ADHD screen.",
+        description = "6 项成人 ADHD 快速筛查。需要完整症状清单（注意力 / 冲动多动两个维度）时，请使用下方的 ASRS-18。",
+        descriptionEn = "A 6-item quick adult ADHD screen. For the full symptom checklist with inattention and hyperactivity-impulsivity subscales, use ASRS-18 below.",
         timeframe = "过去六个月",
         timeframeEn = "Over the past six months",
         instruction = "请选择过去六个月最符合你情况的频率。",
@@ -1937,6 +1952,57 @@ object ScaleCatalog {
         selfHarmQuestionIndex = 0,
     )
 
+
+    private val asrsFreq = listOf(o("从不", "Never", 0), o("很少", "Rarely", 1), o("有时", "Sometimes", 2), o("经常", "Often", 3), o("非常频繁", "Very often", 4))
+
+    val asrs18 = ScaleDef(
+        type = "ASRS18",
+        name = "成人 ADHD 症状清单（ASRS-18）",
+        nameEn = "Adult ADHD Self-Report Scale (ASRS-18)",
+        shortName = "ASRS-18",
+        category = "注意力与其他",
+        categoryEn = "Attention & other",
+        description = "18 项完整症状清单，分为注意力不集中与冲动/多动两个维度；得分是「经常/非常频繁」的条目数。",
+        descriptionEn = "The full 18-item symptom checklist with inattention and hyperactivity-impulsivity subscales; the score counts items rated often or very often.",
+        timeframe = "过去六个月",
+        timeframeEn = "Over the past six months",
+        instruction = "请按过去六个月的情况选择频率；只有「经常 / 非常频繁」才计入症状数。",
+        instructionEn = "Choose the frequency for the past six months; only often or very often count as symptoms.",
+        questions = listOf(
+            q("难以专注细节，或做事粗心大意", "Fail to give close attention to details or make careless mistakes", asrsFreq),
+            q("难以在任务中保持持续专注", "Have difficulty sustaining attention in tasks or activities", asrsFreq),
+            q("别人直接对你说话时，难以专心听", "Do not seem to listen when spoken to directly", asrsFreq),
+            q("难以完成收尾、把细节做完", "Fail to finish details, or do not follow through on instructions", asrsFreq),
+            q("难以组织任务和活动", "Have difficulty organizing tasks and activities", asrsFreq),
+            q("回避或拖延需要持续用脑的任务", "Avoid or delay tasks that require sustained mental effort", asrsFreq),
+            q("经常丢东西（钥匙、手机、文件等）", "Lose things necessary for tasks or activities", asrsFreq),
+            q("容易被外界声音或画面分心", "Are easily distracted by extraneous stimuli", asrsFreq),
+            q("忘记日常事务（预约、缴费、回消息）", "Are forgetful in daily activities", asrsFreq),
+            q("坐着时手脚动来动去，或扭动身体", "Fidget or squirm with your hands or feet", asrsFreq),
+            q("需要坐着的场合难以保持坐姿", "Leave your seat in situations where remaining seated is expected", asrsFreq),
+            q("感到坐立不安、静不下来", "Feel restless or fidgety", asrsFreq),
+            q("难以安静地休闲或玩", "Have difficulty engaging in leisure activities quietly", asrsFreq),
+            q("像被马达驱动一样，停不下来", "Feel on the go, as if driven by a motor", asrsFreq),
+            q("话比一般人多", "Talk excessively", asrsFreq),
+            q("问题还没问完就抢着回答", "Blurt out answers before questions are completed", asrsFreq),
+            q("难以等待轮到自己", "Have difficulty awaiting your turn", asrsFreq),
+            q("打断或打扰别人（插话、插队）", "Interrupt or intrude on others", asrsFreq),
+        ),
+        bands = listOf(
+            b(0, 3, "low", "症状数较少", "Few symptoms", "「经常 / 非常频繁」的条目较少。如果仍然觉得注意力影响生活，可以和医生讨论。", "Few items were rated often or very often. If attention still affects your life, discuss it with a doctor."),
+            b(4, 6, "partial", "有部分症状", "Some symptoms", "已经有部分症状。若这些症状持续并影响工作、学习或关系，建议做进一步评估。", "Some symptoms are present. If they persist and affect work, study or relationships, consider further assessment."),
+            b(7, 18, "elevated", "症状数较多", "Many symptoms", "症状数较多。建议由专业人员评估；ADHD 诊断还需要功能受损和儿童期起病等信息，本结果不能单独作为诊断。", "Many symptoms. A professional assessment is suggested; ADHD diagnosis also needs impairment and childhood onset, so this result alone is not a diagnosis."),
+        ),
+        scoring = ScaleScoring.ASRS18,
+        maxScoreOverride = 18,
+        estimatedMinutes = 4,
+        featured = false,
+        source = "ASRS v1.1: Kessler et al. (2005) / World Health Organization。可免费用于临床与研究，请保留来源。",
+        sourceEn = "ASRS v1.1: Kessler et al. (2005) / World Health Organization. Free for clinical and research use with attribution.",
+        note = "得分只统计「经常 / 非常频繁」的条目；不能单独作为 ADHD 诊断，需结合功能受损与儿童期起病等信息。",
+        noteEn = "Only often or very often items count; this alone cannot diagnose ADHD and must be combined with impairment and childhood onset."
+    )
+
     val all: List<ScaleDef> = listOf(
         phq9,
         gad7,
@@ -1962,6 +2028,7 @@ object ScaleCatalog {
         pss4,
         rosenberg,
         aq10,
+        asrs18,
         pss10,
         stopbang,
         audit,
