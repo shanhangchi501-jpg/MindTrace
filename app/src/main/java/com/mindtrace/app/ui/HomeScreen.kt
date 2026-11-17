@@ -75,6 +75,7 @@ fun HomeScreen(
     onOpenMedications: () -> Unit,
     onOpenInsights: () -> Unit,
     onOpenScales: () -> Unit,
+    onOpenAllJournals: () -> Unit,
     onOpenReport: () -> Unit,
     onOpenSafety: () -> Unit,
     onOpenCrisis: () -> Unit
@@ -91,7 +92,6 @@ fun HomeScreen(
     val todayCheckIn = checkIns.firstOrNull { it.date == today }
     val symptomNames = remember(symptoms) { symptoms.associate { it.id to it.name } }
     val asNeededMeds = medications.filter { it.asNeeded }
-    var showAllJournals by rememberSaveable { mutableStateOf(false) }
 
     var doses by remember { mutableStateOf(emptyList<DoseSlot>()) }
     LaunchedEffect(medications, todayLogs, today) {
@@ -259,6 +259,9 @@ fun HomeScreen(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )
+                if (journal.isNotEmpty()) {
+                    TextButton(onClick = onOpenAllJournals) { Text("查看所有") }
+                }
                 TextButton(onClick = { onAddJournal(today) }) { Text("写一篇") }
             }
         }
@@ -272,20 +275,9 @@ fun HomeScreen(
                 )
             }
         } else {
-            val visibleJournals = if (showAllJournals) journal else journal.take(4)
+            val visibleJournals = journal.take(4)
             items(visibleJournals, key = { "journal_${it.id}" }) { entry ->
                 JournalCard(entry = entry, onClick = { onEditJournal(entry.id) })
-            }
-            if (journal.size > 4) {
-                item {
-                    TextButton(onClick = { showAllJournals = !showAllJournals }) {
-                        Text(
-                            if (showAllJournals) "收起"
-                            else if (language.isEnglish) "Show all ${journal.size} entries"
-                            else "查看全部 ${journal.size} 篇"
-                        )
-                    }
-                }
             }
         }
 

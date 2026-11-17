@@ -60,6 +60,7 @@ private object Routes {
     const val MED_EDIT = "med_edit/{medId}"
     const val MED_BACKFILL = "med_backfill"
     const val SCALE_HISTORY = "scale_history"
+    const val JOURNAL_HISTORY = "journal_history"
     const val SCALES = "scales"
     const val SCALES_ALL = "scales_all"
     const val SCALE = "scale/{type}"
@@ -234,6 +235,7 @@ fun MainApp(
                         onOpenMedications = { navController.navigate(Routes.MEDICATIONS) },
                         onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
                         onOpenScales = { navController.navigate(Routes.SCALES) },
+                        onOpenAllJournals = { navController.navigate(Routes.JOURNAL_HISTORY) },
                         onOpenReport = { navController.navigate(Routes.REPORT) },
                         onOpenSafety = { navController.navigate(Routes.SAFETY) },
                         onOpenCrisis = { navController.navigate(Routes.CRISIS) }
@@ -367,6 +369,14 @@ fun MainApp(
                     MedicationBackfillScreen(
                         viewModel = viewModel,
                         onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Routes.JOURNAL_HISTORY) {
+                    JournalHistoryScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() },
+                        onOpenJournal = { id, date -> navController.navigate("journal_edit/$id/$date") }
                     )
                 }
 
