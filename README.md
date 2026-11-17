@@ -4,7 +4,7 @@
 
 它不是诊断工具，也不替代医生。它只做一件事：帮你把每天的起伏留下来，并在复诊时整理成医生容易阅读的报告。
 
-**当前版本：0.4.9（正式签名版）** · [发布说明](RELEASE_NOTES.md) · [变更记录](CHANGELOG.md)
+**当前版本：0.4.10（正式签名版）** · [发布说明](RELEASE_NOTES.md) · [变更记录](CHANGELOG.md)
 
 ## 截图
 
@@ -28,7 +28,7 @@
 | --- | --- | --- |
 | ![深色趋势](docs/screenshots/13-trends-dark.png) | ![PDF 1](docs/screenshots/14-pdf-page1.png) | ![PDF 2](docs/screenshots/15-pdf-page2.png) |
 
-## 已实现（0.4.9 正式版）
+## 已实现（0.4.10 正式版）
 
 - 首次引导：医疗免责声明、病种/症状选择、提醒设置、可选应用锁
 - **5 个底部标签**：今天、药物、趋势、科普、我的；页面常驻组合，切换无闪烁且保留滚动位置
@@ -128,12 +128,12 @@ APK、示例 PDF、测试数据集与 SHA-256 见 [GitHub Releases](https://gith
 
 最新版本：[v0.4.1](https://github.com/shanhangchi501-jpg/MindTrace/releases/tag/v0.4.1)
 
-0.4.9 Release APK SHA-256：`d8bc1bc5073c2c738664fef8215961bd06fac707b5e0dc997bbd4ac229b825dd`
+0.4.10 Release APK SHA-256：`bba615fac53cdee3aa8e9f3c89e27d39a231897727784bb59575cf0e6200eb2b`
 
 ### 宣传 / 演示素材
 
 - 演示数据集：`MindTrace-Demo-Dataset.mtbackup`（密码 `mindtrace-demo`），导入后得到 30 天打卡、3 种药物、62 条服药记录、5 份量表、4 篇日记、安全计划与 2 条诊断
-- 使用 0.4.9 正式版安装后，在「我的 → 设置 → 数据与报告 → 从备份恢复」选择该文件即可
+- 使用 0.4.10 正式版安装后，在「我的 → 设置 → 数据与报告 → 从备份恢复」选择该文件即可
 - 截图与 PDF 示例见 [docs/screenshots](docs/screenshots)
 
 ## 目录

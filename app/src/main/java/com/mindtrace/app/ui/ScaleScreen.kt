@@ -269,40 +269,47 @@ private fun ResultContent(
                     if (defType == "ASRS18") {
                         val inattention = (0..8).count { (answers.getOrNull(it) ?: 0) >= 3 }
                         val hyperactivity = (9..17).count { (answers.getOrNull(it) ?: 0) >= 3 }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    "$inattention",
-                                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Normal),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     if (english) "Inattention" else "注意力不集中",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
                                 )
-                            }
-                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    "$hyperactivity",
-                                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Normal),
+                                    "$inattention / 9",
+                                    style = MaterialTheme.typography.headlineMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     if (english) "Hyperactivity / impulsivity" else "冲动 / 多动",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    "$hyperactivity / 9",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                if (english) "Each domain out of 9 · only often / very often count"
+                                else "每个维度满分 9 · 只计「经常 / 非常频繁」",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        Text(
-                            if (english) "Symptoms out of 9 in each domain" else "每个维度满分 9（只计「经常 / 非常频繁」）",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
                     } else {
                         Text(
                             "${result.score}",
@@ -338,7 +345,7 @@ private fun ResultContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (!detail.isNullOrBlank()) {
+                if (!detail.isNullOrBlank() && defType != "ASRS18") {
                     Spacer(Modifier.height(10.dp))
                     Text(
                         detail,
