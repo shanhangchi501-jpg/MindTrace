@@ -449,7 +449,7 @@ private fun ScaleSummaryCard(
                     ) {
                         Text(def.shortName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "${result.score} / ${def.maxScore}",
+                            "${def.formatScore(result.score)} / ${def.formatMaxScore()}",
                             style = MaterialTheme.typography.titleLarge,
                             color = scoreColor(result, def.type)
                         )

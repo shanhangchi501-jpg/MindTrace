@@ -304,7 +304,7 @@ fun HomeScreen(
                             when {
                                 recentScale == null -> "PHQ-9 / GAD-7，约 2 分钟"
                                 scaleDays != null && scaleDays <= 13 ->
-                                    "${scaleLabel(recentScale)} · ${recentScale.score} 分，${bandLabel(recentScale)}"
+                                    "${scaleLabel(recentScale)} · ${ScaleCatalog.byType(recentScale.type)?.formatScore(recentScale.score) ?: recentScale.score} 分，${bandLabel(recentScale)}"
                                 else -> "距上次自评已 ${scaleDays ?: 0} 天，可以再测一次"
                             },
                             style = MaterialTheme.typography.bodySmall,

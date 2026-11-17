@@ -578,7 +578,7 @@ object ReportPdfGenerator {
                 val date = DateUtils.iso(
                     DateUtils.toLocalDateTime(result.createdAt).toLocalDate()
                 )
-                val line = "$date · $name  ${result.score} / ${def?.maxScore ?: "?"} · $band"
+                val line = "$date · $name  ${def?.formatScore(result.score) ?: result.score} / ${def?.formatMaxScore() ?: "?"} · $band"
                 drawText(line, margin, y + 8f, 8f, ink)
                 y += 13f
             }
@@ -1011,7 +1011,7 @@ object ReportPdfGenerator {
                     val date = DateUtils.displayShort(
                         DateUtils.iso(DateUtils.toLocalDateTime(result.createdAt).toLocalDate())
                     )
-                    val line = "$date · $name ${result.score}/${def?.maxScore ?: "?"} · $band"
+                    val line = "$date · $name ${def?.formatScore(result.score) ?: result.score}/${def?.formatMaxScore() ?: "?"} · $band"
                     val paint = paint(6.1f, ink)
                     canvas?.drawText(
                         ellipsize(line, paint, columnWidth),

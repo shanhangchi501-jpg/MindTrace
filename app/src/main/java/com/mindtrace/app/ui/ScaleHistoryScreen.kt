@@ -80,7 +80,7 @@ fun ScaleHistoryScreen(
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    "${DateUtils.displayTimestamp(item.createdAt)} · ${item.score}${def?.let { " / ${it.maxScore}" } ?: ""}",
+                                    "${DateUtils.displayTimestamp(item.createdAt)} · ${def?.formatScore(item.score) ?: item.score}${def?.let { " / ${it.formatMaxScore()}" } ?: ""}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -121,7 +121,7 @@ fun ScaleHistoryScreen(
             text = {
                 Column {
                     Text(
-                        "${DateUtils.displayTimestamp(item.createdAt)} · ${item.score}${def?.let { " / ${it.maxScore}" } ?: ""}",
+                        "${DateUtils.displayTimestamp(item.createdAt)} · ${def?.formatScore(item.score) ?: item.score}${def?.let { " / ${it.formatMaxScore()}" } ?: ""}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

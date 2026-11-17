@@ -1,5 +1,7 @@
 package com.mindtrace.app.data
 
+import java.util.Locale
+
 data class ScaleOption(
     val label: String,
     val labelEn: String,
@@ -31,8 +33,14 @@ enum class ScaleScoring {
     /** 取所有题目的平均值（四舍五入），用于 DES-II 这类按平均分解释的量表。 */
     MEAN,
 
-    /** ASRS-18：得分 = 评为「经常/非常频繁」的条目数（0-18）。 */
-    ASRS18
+    /** ASRS-18：A/B 两部分各 9 题，分别求和 0-36，取较高者作为总分。 */
+    ASRS18,
+
+    /** BSL-23：23 个计分题的平均分，按 0.1 精度保存（0-40 表示 0.0-4.0）。 */
+    BSL23,
+
+    /** C-SSRS 筛查版：统计 6 个是/否题中的阳性数量，并结合条目分级。 */
+    CSSRS
 }
 
 data class ScaleDef(
@@ -58,11 +66,28 @@ data class ScaleDef(
     val sourceEn: String = "",
     val note: String = "",
     val noteEn: String = "",
-    val selfHarmQuestionIndex: Int? = null
+    val selfHarmQuestionIndex: Int? = null,
+    /** 额外的自伤/自杀风险题索引（与 selfHarmQuestionIndex 一起触发安全提示）。 */
+    val riskQuestionIndices: List<Int> = emptyList(),
+    /** 参与计分的题目数量；补充题或不计分题放在末尾。 */
+    val scoredQuestionCount: Int = questions.size,
+    /** 不计分的补充题起始索引；用于在答题时显示说明。 */
+    val supplementStartIndex: Int? = null,
+    /** 计分结果的显示除数：1 表示整数分，10 表示 0.1 精度的平均分。 */
+    val scoreDivisor: Int = 1
 ) {
     val maxScore: Int
         get() = maxScoreOverride
-            ?: questions.sumOf { q -> q.options.maxOfOrNull { it.value } ?: 0 }
+            ?: questions.take(scoredQuestionCount).sumOf { q -> q.options.maxOfOrNull { it.value } ?: 0 }
+
+    val effectiveRiskQuestionIndices: List<Int>
+        get() = listOfNotNull(selfHarmQuestionIndex) + riskQuestionIndices
+
+    fun formatScore(raw: Int): String =
+        if (scoreDivisor <= 1) raw.toString()
+        else String.format(Locale.US, "%.1f", raw.toDouble() / scoreDivisor)
+
+    fun formatMaxScore(): String = formatScore(maxScore)
 
     fun questionText(index: Int, english: Boolean): String {
         val question = questions.getOrNull(index) ?: return ""
@@ -82,14 +107,31 @@ data class ScaleDef(
     fun score(answers: List<Int>): Int = when (scoring) {
         ScaleScoring.MDQ -> (0 until 13).sumOf { optionValue(it, answers.getOrElse(it) { 1 }) }
         ScaleScoring.PSQI -> psqiScore(answers)
-        ScaleScoring.ASRS18 -> answers.indices.count { index ->
-            optionValue(index, answers.getOrElse(index) { 0 }) >= 3
+        ScaleScoring.ASRS18 -> {
+            val inattention = (0..8).sumOf { index ->
+                optionValue(index, answers.getOrElse(index) { 0 })
+            }
+            val hyperactivity = (9..17).sumOf { index ->
+                optionValue(index, answers.getOrElse(index) { 0 })
+            }
+            maxOf(inattention, hyperactivity)
         }
         ScaleScoring.MEAN -> {
-            val sum = answers.indices.sumOf { index -> optionValue(index, answers.getOrElse(index) { 0 }) }
-            if (questions.isEmpty()) 0 else (sum + questions.size / 2) / questions.size
+            val sum = (0 until minOf(scoredQuestionCount, answers.size)).sumOf { index ->
+                optionValue(index, answers.getOrElse(index) { 0 })
+            }
+            if (scoredQuestionCount <= 0) 0 else (sum + scoredQuestionCount / 2) / scoredQuestionCount
         }
-        else -> answers.indices.sumOf { index ->
+        ScaleScoring.BSL23 -> {
+            val sum = (0 until minOf(scoredQuestionCount, 23)).sumOf { index ->
+                optionValue(index, answers.getOrElse(index) { 0 })
+            }
+            if (sum == 0) 0 else (sum * 10 + 11) / 23
+        }
+        ScaleScoring.CSSRS -> (0 until minOf(6, answers.size)).count { index ->
+            optionValue(index, answers.getOrElse(index) { 1 }) > 0
+        }
+        else -> (0 until minOf(scoredQuestionCount, answers.size)).sumOf { index ->
             optionValue(index, answers.getOrElse(index) { 0 })
         }
     }
@@ -108,13 +150,21 @@ data class ScaleDef(
         }
         ScaleScoring.DASS21 -> severityDass21(answers)
         ScaleScoring.ASRS18 -> {
-            val inattention = (0..8).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
-            val hyperactivity = (9..17).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
             val key = when {
-                inattention >= 4 && hyperactivity >= 4 -> "adhd_c"
-                inattention >= 4 -> "adhd_i"
-                hyperactivity >= 4 -> "adhd_h"
-                else -> "below"
+                score(answers) >= 24 -> "very_likely"
+                score(answers) >= 17 -> "likely"
+                else -> "unlikely"
+            }
+            bands.firstOrNull { it.key == key } ?: bands.last()
+        }
+        ScaleScoring.CSSRS -> {
+            val positive = { index: Int ->
+                optionValue(index, answers.getOrElse(index) { 1 }) > 0
+            }
+            val key = when {
+                listOf(3, 4, 6).any(positive) -> "high"
+                (0..2).any(positive) || positive(5) -> "moderate"
+                else -> "negative"
             }
             bands.firstOrNull { it.key == key } ?: bands.last()
         }
@@ -173,18 +223,94 @@ data class ScaleDef(
                 }
             }
             "ASRS18" -> {
-                val inattention = (0..8).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
-                val hyperactivity = (9..17).count { optionValue(it, answers.getOrElse(it) { 0 }) >= 3 }
+                val inattention = (0..8).sumOf { optionValue(it, answers.getOrElse(it) { 0 }) }
+                val hyperactivity = (9..17).sumOf { optionValue(it, answers.getOrElse(it) { 0 }) }
                 if (english) {
-                    "Inattention " + inattention + " / 9 · Hyperactivity-impulsivity " + hyperactivity + " / 9 · 4 or more in either domain suggests further assessment."
+                    "Part A (inattention) $inattention / 36 · Part B (hyperactivity-impulsivity) $hyperactivity / 36 · interpretation uses the higher part"
                 } else {
-                    "注意力 " + inattention + " / 9 · 冲动/多动 " + hyperactivity + " / 9 · 任一维度达到 4 项及以上提示需要进一步评估。"
+                    "A 部分（注意力不集中）$inattention / 36 · B 部分（冲动/多动）$hyperactivity / 36 · 分级取较高的一部分"
                 }
             }
             "AUDITC" -> if (english) {
                 "Cut-offs vary by sex: 3+ for women, 4+ for men. This is a screening result, not a diagnosis."
             } else {
                 "不同性别的参考界值不同：女性 3 分及以上、男性 4 分及以上。此结果仅用于筛查，不是诊断。"
+            }
+            "BSL23" -> {
+                val mean = String.format(Locale.US, "%.1f", score(answers).toDouble() / 10)
+                val supplement = (scoredQuestionCount until questions.size).count { index ->
+                    optionValue(index, answers.getOrElse(index) { 0 }) > 0
+                }
+                if (english) {
+                    "Mean $mean / 4 · $supplement supplement behaviour item(s) reported at least once (not scored)"
+                } else {
+                    "平均分 $mean / 4 · 补充行为项目中有 $supplement 项报告至少一次（不计入总分）"
+                }
+            }
+            "CSSRS" -> {
+                val positives = (0 until minOf(scoredQuestionCount, 6)).filter { index ->
+                    optionValue(index, answers.getOrElse(index) { 1 }) > 0
+                }
+                val list = if (positives.isEmpty()) {
+                    if (english) "none" else "无"
+                } else {
+                    positives.joinToString("、") { "#${it + 1}" }
+                }
+                if (english) {
+                    "Positive answers: $list · a yes on item 4, 5 or recent behaviour indicates high risk"
+                } else {
+                    "阳性条目：$list · 第 4、5 题或近三个月自杀行为为「是」属于高风险"
+                }
+            }
+            "IESR" -> {
+                val intrusion = subscale(answers, intArrayOf(0, 1, 2, 5, 8, 13, 15, 19))
+                val avoidance = subscale(answers, intArrayOf(4, 6, 7, 10, 11, 12, 16, 21))
+                val hyperarousal = subscale(answers, intArrayOf(3, 9, 14, 17, 18, 20))
+                if (english) {
+                    "Intrusion $intrusion / 32 · Avoidance $avoidance / 32 · Hyperarousal $hyperarousal / 24 · Total ${score(answers)} / 88"
+                } else {
+                    "侵入 $intrusion / 32 · 回避 $avoidance / 32 · 警觉 $hyperarousal / 24 · 总分 ${score(answers)} / 88"
+                }
+            }
+            "MSPSS" -> {
+                val significant = subscale(answers, intArrayOf(0, 1, 4, 9))
+                val family = subscale(answers, intArrayOf(2, 3, 7, 10))
+                val friends = subscale(answers, intArrayOf(5, 6, 8, 11))
+                val mean = String.format(Locale.US, "%.1f", score(answers).toDouble() / 12)
+                if (english) {
+                    "Significant other $significant / 28 · Family $family / 28 · Friends $friends / 28 · Mean $mean / 7"
+                } else {
+                    "特别的人 $significant / 28 · 家人 $family / 28 · 朋友 $friends / 28 · 平均分 $mean / 7"
+                }
+            }
+            "FFMQ39" -> {
+                val observing = subscale(answers, intArrayOf(0, 5, 10, 14, 19, 25, 30, 35))
+                val describing = subscale(answers, intArrayOf(1, 6, 11, 15, 21, 26, 31, 36))
+                val awareness = subscale(answers, intArrayOf(4, 7, 12, 17, 22, 27, 33, 37))
+                val nonjudging = subscale(answers, intArrayOf(2, 9, 13, 16, 24, 29, 34, 38))
+                val nonreactivity = subscale(answers, intArrayOf(3, 8, 18, 20, 23, 28, 32))
+                if (english) {
+                    "Observing $observing / 40 · Describing $describing / 40 · Acting with awareness $awareness / 40 · " +
+                        "Nonjudging $nonjudging / 40 · Nonreactivity $nonreactivity / 35"
+                } else {
+                    "观察 $observing / 40 · 描述 $describing / 40 · 觉知行动 $awareness / 40 · " +
+                        "不评判 $nonjudging / 40 · 不反应 $nonreactivity / 35"
+                }
+            }
+            "DERS36" -> {
+                val nonacceptance = subscale(answers, intArrayOf(10, 11, 20, 22, 24, 28))
+                val goals = subscale(answers, intArrayOf(12, 17, 19, 25, 32))
+                val impulse = subscale(answers, intArrayOf(2, 13, 18, 23, 26, 31))
+                val awareness = subscale(answers, intArrayOf(1, 5, 7, 9, 16, 33))
+                val strategies = subscale(answers, intArrayOf(14, 15, 21, 27, 29, 30, 34, 35))
+                val clarity = subscale(answers, intArrayOf(0, 3, 4, 6, 8))
+                if (english) {
+                    "Nonacceptance $nonacceptance / 30 · Goals $goals / 25 · Impulse $impulse / 30 · " +
+                        "Awareness $awareness / 30 · Strategies $strategies / 40 · Clarity $clarity / 25"
+                } else {
+                    "不接受 $nonacceptance / 30 · 目标受阻 $goals / 25 · 冲动控制 $impulse / 30 · " +
+                        "觉察 $awareness / 30 · 调节策略 $strategies / 40 · 清晰度 $clarity / 25"
+                }
             }
             else -> null
         }
@@ -239,56 +365,81 @@ data class ScaleDef(
         }
     }
 
-    private fun psqiScore(answers: List<Int>): Int {
-        val quality = optionValue(17, answers.getOrElse(17) { 0 })
-        val latency = optionValue(1, answers.getOrElse(1) { 0 }).coerceIn(0, 3)
-        val duration = optionValue(3, answers.getOrElse(3) { 0 }).coerceIn(0, 3)
+    private fun psqiLatencyComponent(answers: List<Int>): Int {
+        val raw = optionValue(1, answers.getOrElse(1) { 0 }) +
+            optionValue(4, answers.getOrElse(4) { 0 })
+        return when {
+            raw == 0 -> 0
+            raw <= 2 -> 1
+            raw <= 4 -> 2
+            else -> 3
+        }
+    }
+
+    private fun psqiEfficiencyComponent(answers: List<Int>): Int {
+        val bedtime = optionValue(0, answers.getOrElse(0) { 0 })
+        val wake = optionValue(2, answers.getOrElse(2) { 0 })
+        val minutesInBed = if (wake > bedtime) wake - bedtime else wake + 1440 - bedtime
+        if (minutesInBed <= 0) return 0
+        val sleepHalfHours = when (optionValue(3, answers.getOrElse(3) { 0 })) {
+            0 -> 15.0
+            1 -> 13.0
+            2 -> 11.0
+            else -> 9.0
+        }
+        val sleepMinutes = minOf(sleepHalfHours * 30.0, minutesInBed.toDouble())
+        val efficiency = sleepMinutes / minutesInBed
+        return when {
+            efficiency >= 0.85 -> 0
+            efficiency >= 0.75 -> 1
+            efficiency >= 0.65 -> 2
+            else -> 3
+        }
+    }
+
+    private fun psqiDisturbanceComponent(answers: List<Int>): Int {
         val disturbances = (5..13).sumOf { optionValue(it, answers.getOrElse(it) { 0 }) }
-        val disturbanceComponent = when {
+        return when {
             disturbances == 0 -> 0
             disturbances <= 9 -> 1
             disturbances <= 18 -> 2
             else -> 3
         }
-        val medication = optionValue(14, answers.getOrElse(14) { 0 }).coerceIn(0, 3)
-        val daytime = (15..16).sumOf { optionValue(it, answers.getOrElse(it) { 0 }) } +
-            optionValue(18, answers.getOrElse(18) { 0 })
-        val daytimeComponent = when {
-            daytime == 0 -> 0
-            daytime <= 3 -> 1
-            daytime <= 6 -> 2
+    }
+
+    private fun psqiDaytimeComponent(answers: List<Int>): Int {
+        val raw = (15..16).sumOf { optionValue(it, answers.getOrElse(it) { 0 }) }
+        return when {
+            raw == 0 -> 0
+            raw <= 2 -> 1
+            raw <= 4 -> 2
             else -> 3
         }
-        return quality + latency + duration + duration + disturbanceComponent +
-            medication + daytimeComponent
     }
+
+    private fun psqiScore(answers: List<Int>): Int =
+        optionValue(17, answers.getOrElse(17) { 0 }) +
+            psqiLatencyComponent(answers) +
+            optionValue(3, answers.getOrElse(3) { 0 }).coerceIn(0, 3) +
+            psqiEfficiencyComponent(answers) +
+            psqiDisturbanceComponent(answers) +
+            optionValue(14, answers.getOrElse(14) { 0 }).coerceIn(0, 3) +
+            psqiDaytimeComponent(answers)
 
     private fun psqiDetail(answers: List<Int>, english: Boolean): String {
         val quality = optionValue(17, answers.getOrElse(17) { 0 })
-        val latency = optionValue(1, answers.getOrElse(1) { 0 }).coerceIn(0, 3)
+        val latency = psqiLatencyComponent(answers)
         val duration = optionValue(3, answers.getOrElse(3) { 0 }).coerceIn(0, 3)
-        val disturbances = (5..13).sumOf { optionValue(it, answers.getOrElse(it) { 0 }) }
-        val disturbanceComponent = when {
-            disturbances == 0 -> 0
-            disturbances <= 9 -> 1
-            disturbances <= 18 -> 2
-            else -> 3
-        }
+        val efficiency = psqiEfficiencyComponent(answers)
+        val disturbance = psqiDisturbanceComponent(answers)
         val medication = optionValue(14, answers.getOrElse(14) { 0 }).coerceIn(0, 3)
-        val daytimeRaw = (15..16).sumOf { optionValue(it, answers.getOrElse(it) { 0 }) } +
-            optionValue(18, answers.getOrElse(18) { 0 })
-        val daytime = when {
-            daytimeRaw == 0 -> 0
-            daytimeRaw <= 3 -> 1
-            daytimeRaw <= 6 -> 2
-            else -> 3
-        }
+        val daytime = psqiDaytimeComponent(answers)
         return if (english) {
-            "Quality $quality · Latency $latency · Duration $duration · Disturbance $disturbanceComponent · " +
-                "Medication $medication · Daytime $daytime (each 0–3)"
+            "Quality $quality · Latency $latency · Duration $duration · Efficiency $efficiency · " +
+                "Disturbance $disturbance · Medication $medication · Daytime $daytime (each 0–3; total ${psqiScore(answers)}/21)"
         } else {
-            "主观质量 $quality · 入睡潜伏期 $latency · 睡眠时长 $duration · 睡眠紊乱 $disturbanceComponent · " +
-                "助眠药物 $medication · 日间功能 $daytime（各 0–3 分）"
+            "主观质量 $quality · 入睡潜伏期 $latency · 睡眠时长 $duration · 睡眠效率 $efficiency · " +
+                "睡眠紊乱 $disturbance · 助眠药物 $medication · 日间功能 $daytime（各 0–3 分；总分 ${psqiScore(answers)}/21）"
         }
     }
 }
@@ -361,12 +512,25 @@ object ScaleCatalog {
         o("从未", "At no time", 0)
     )
 
-    private val psqiTimeOptions = listOf(
-        o("21:00 之前", "Before 21:00", 0),
-        o("21:00–22:00", "21:00–22:00", 0),
-        o("22:00–23:00", "22:00–23:00", 0),
-        o("23:00–24:00", "23:00–24:00", 0),
-        o("00:00 之后", "After 00:00", 0)
+    private val psqiBedtimeOptions = listOf(
+        o("20:00 之前", "Before 20:00", 1200),
+        o("20:00–21:00", "20:00–21:00", 1230),
+        o("21:00–22:00", "21:00–22:00", 1290),
+        o("22:00–23:00", "22:00–23:00", 1350),
+        o("23:00–00:00", "23:00–00:00", 1410),
+        o("00:00–01:00", "00:00–01:00", 30),
+        o("01:00–02:00", "01:00–02:00", 90),
+        o("02:00 之后", "After 02:00", 150)
+    )
+
+    private val psqiWakeOptions = listOf(
+        o("04:00 之前", "Before 04:00", 240),
+        o("04:00–05:00", "04:00–05:00", 270),
+        o("05:00–06:00", "05:00–06:00", 330),
+        o("06:00–07:00", "06:00–07:00", 390),
+        o("07:00–08:00", "07:00–08:00", 450),
+        o("08:00–09:00", "08:00–09:00", 510),
+        o("09:00 之后", "After 09:00", 570)
     )
 
     private val psqiLatencyOptions = listOf(
@@ -1253,21 +1417,21 @@ object ScaleCatalog {
 
     val psqi = ScaleDef(
         type = "PSQI",
-        name = "匹兹堡睡眠质量指数（PSQI，简化版）",
-        nameEn = "Pittsburgh Sleep Quality Index (PSQI, simplified)",
+        name = "匹兹堡睡眠质量指数（PSQI）",
+        nameEn = "Pittsburgh Sleep Quality Index (PSQI)",
         shortName = "PSQI",
         category = "睡眠",
         categoryEn = "Sleep",
-        description = "19 项自评，了解过去一个月的睡眠质量。",
-        descriptionEn = "A 19-item self-report of sleep quality over the past month.",
+        description = "按标准七个成分计分的睡眠质量自评，了解过去一个月的睡眠。",
+        descriptionEn = "A sleep quality measure scored with the standard seven components over the past month.",
         timeframe = "过去一个月",
         timeframeEn = "Over the past month",
-        instruction = "以下问题关于过去一个月的睡眠习惯。请选择最接近的情况。",
-        instructionEn = "The following questions are about your sleep habits over the past month. Choose the closest answer.",
+        instruction = "以下问题关于过去一个月的睡眠习惯。请选择最接近的情况；上床和起床时间以小时区间近似。",
+        instructionEn = "The following questions are about your sleep habits over the past month. Choose the closest answer; bedtime and wake time use one-hour ranges.",
         questions = listOf(
-            q("你通常几点上床睡觉？", "What time have you usually gone to bed?", psqiTimeOptions),
+            q("你通常几点上床睡觉？", "What time have you usually gone to bed?", psqiBedtimeOptions),
             q("你通常需要多久才能入睡？", "How long has it usually taken you to fall asleep?", psqiLatencyOptions),
-            q("你通常几点起床？", "What time have you usually gotten up?", listOf(o("05:00 之前", "Before 05:00", 0), o("05:00–06:00", "05:00–06:00", 0), o("06:00–07:00", "06:00–07:00", 0), o("07:00–08:00", "07:00–08:00", 0), o("08:00 之后", "After 08:00", 0))),
+            q("你通常几点起床？", "What time have you usually gotten up?", psqiWakeOptions),
             q("你每晚实际睡眠多久？", "How many hours of actual sleep did you get at night?", psqiDurationOptions),
             q("过去一个月，你有多经常难以在 30 分钟内入睡？", "How often have you had trouble sleeping because you could not get to sleep within 30 minutes?", psqiFreqOptions),
             q("夜间或清晨醒来", "Wake up in the middle of the night or early morning", psqiFreqOptions),
@@ -1282,8 +1446,7 @@ object ScaleCatalog {
             q("需要药物帮助入睡", "How often have you taken medicine to help you sleep?", psqiFreqOptions),
             q("白天难以保持清醒", "How often have you had trouble staying awake while driving, eating or socialising?", psqiFreqOptions),
             q("保持做事的热情有困难", "How much of a problem has it been to keep up enough enthusiasm to get things done?", listOf(o("没有困难", "No problem at all", 0), o("只有一点困难", "Only a very slight problem", 1), o("有些困难", "Somewhat of a problem", 2), o("困难很大", "A very big problem", 3))),
-            q("整体睡眠质量", "Overall sleep quality", listOf(o("很好", "Very good", 0), o("较好", "Fairly good", 1), o("较差", "Fairly bad", 2), o("很差", "Very bad", 3))),
-            q("白天感到疲倦或精力不足", "How often have you felt tired or low in energy during the day?", psqiFreqOptions)
+            q("整体睡眠质量", "Overall sleep quality", listOf(o("很好", "Very good", 0), o("较好", "Fairly good", 1), o("较差", "Fairly bad", 2), o("很差", "Very bad", 3)))
         ),
         bands = listOf(
             b(0, 5, "good", "睡眠质量较好", "Good sleep quality", "PSQI 总分较低，睡眠质量总体较好。", "The PSQI total is low, suggesting generally good sleep quality."),
@@ -1297,8 +1460,8 @@ object ScaleCatalog {
         featured = false,
         source = "PSQI: Buysse et al. (1989). 临床与研究常用；电子版再分发前请确认授权。",
         sourceEn = "PSQI: Buysse et al. (1989). Commonly used in clinical care and research; check permission before redistributing an electronic version.",
-        note = "这是简化自评版，未计算完整睡眠效率；结果仅用于记录与就诊沟通。",
-        noteEn = "This is a simplified self-report version and does not calculate full sleep efficiency; use it for tracking and clinical communication only."
+        note = "按标准 PSQI 七成分计分：主观质量、入睡潜伏期、睡眠时长、睡眠效率、睡眠紊乱、助眠药物、日间功能。上床/起床时间用小时区间近似，睡眠效率为估算值；结果仅用于记录与就诊沟通。",
+        noteEn = "Scored with the standard seven PSQI components: subjective quality, latency, duration, efficiency, disturbance, medication and daytime dysfunction. Bedtime and wake time use one-hour ranges, so efficiency is approximate; use for tracking and clinical communication only."
     )
 
     val pss4 = ScaleDef(
@@ -1964,6 +2127,610 @@ object ScaleCatalog {
     )
 
 
+    private val bslOptions = listOf(
+        o("一点也没有", "Not at all", 0),
+        o("有点困扰", "A little", 1),
+        o("相当困扰", "Rather", 2),
+        o("非常困扰", "Much", 3),
+        o("很严重的困扰", "Very strong", 4)
+    )
+
+    private val bslSupplementOptions = listOf(
+        o("一次也没有", "Not at all", 0),
+        o("有过一次", "Once", 1),
+        o("出现 2–3 次", "2–3 times", 2),
+        o("出现 4–6 次", "4–6 times", 3),
+        o("每天都有或更常出现", "Daily or more often", 4)
+    )
+
+    val bsl23 = ScaleDef(
+        type = "BSL23",
+        name = "边缘型症状量表（BSL-23）",
+        nameEn = "Borderline Symptom List (BSL-23)",
+        shortName = "BSL-23",
+        category = "人格与情绪调节",
+        categoryEn = "Personality & emotion regulation",
+        description = "23 项边缘型症状自评，得分是 23 题的平均分；另含 11 项不计分的行为补充题。",
+        descriptionEn = "A 23-item measure of borderline symptoms scored as the mean of 23 items, plus 11 unscored behaviour items.",
+        timeframe = "过去一周",
+        timeframeEn = "Over the past week",
+        instruction = "请评定过去一星期里，以下困难或问题给你带来的困扰程度。如果某一周内感受有高有低，请按平均情况作答。最后 11 题询问行为，不计入总分。",
+        instructionEn = "Rate how much each difficulty bothered you over the past week. If things varied, give an average rating. The final 11 items ask about behaviours and are not included in the total score.",
+        questions = listOf(
+            q("我很难专心", "It was hard for me to concentrate", bslOptions),
+            q("我觉得很无助", "I felt helpless", bslOptions),
+            q("我会心不在焉，记不得我做过什么事", "I was absent-minded and unable to remember what I was actually doing", bslOptions),
+            q("我觉得厌恶", "I felt disgust", bslOptions),
+            q("我考虑要伤害自己", "I thought of hurting myself", bslOptions),
+            q("我不信任别人", "I didn't trust other people", bslOptions),
+            q("我不觉得自己有权利活下去", "I didn't believe in my right to live", bslOptions),
+            q("我很寂寞", "I was lonely", bslOptions),
+            q("我的精神紧绷，令我压力很大", "I experienced stressful inner tension", bslOptions),
+            q("我脑海有令我非常害怕的影像", "I had images that I was very much afraid of", bslOptions),
+            q("我恨我自己", "I hated myself", bslOptions),
+            q("我想惩罚我自己", "I wanted to punish myself", bslOptions),
+            q("我感到羞耻，因而觉得困扰", "I suffered from shame", bslOptions),
+            q("我的心情反复感到焦虑、愤怒、忧郁，快速起伏变化", "My mood rapidly cycled in terms of anxiety, anger, and depression", bslOptions),
+            q("我对于来自脑子里或外面的声音和噪音感到困扰", "I suffered from voices and noises from inside or outside my head", bslOptions),
+            q("别人的批评会对我造成巨大的影响", "Criticism had a devastating effect on me", bslOptions),
+            q("我觉得自己很脆弱", "I felt vulnerable", bslOptions),
+            q("对我来说，想死的念头具有某种程度的吸引力", "The idea of death had a certain fascination for me", bslOptions),
+            q("每件事情对我来说似乎都是没意义的", "Everything seemed senseless to me", bslOptions),
+            q("我担心自己会失去控制", "I was afraid of losing control", bslOptions),
+            q("我对自己感到厌恶", "I felt disgusted by myself", bslOptions),
+            q("我觉得自己仿佛离自己很远", "I felt as if I was far away from myself", bslOptions),
+            q("我觉得自己一无是处", "I felt worthless", bslOptions),
+            // 以下为不计分的补充行为项目
+            q("我以割伤、烧伤、勒自己或撞墙等方式伤害自己", "I hurt myself by cutting, burning, strangling, headbanging etc.", bslSupplementOptions),
+            q("我告诉别人我要去自杀", "I told other people that I was going to kill myself", bslSupplementOptions),
+            q("我尝试结束自己的生命", "I tried to commit suicide", bslSupplementOptions),
+            q("我超量地大吃大喝", "I had episodes of binge eating", bslSupplementOptions),
+            q("我催吐", "I induced vomiting", bslSupplementOptions),
+            q("我做出高危险性的行为，例如故意开快车、在高楼屋顶奔跑、在窄桥上摇晃走动等", "I displayed high-risk behavior by knowingly driving too fast, running around on the roofs of high buildings, balancing on bridges, etc.", bslSupplementOptions),
+            q("我喝酒喝到醉", "I got drunk", bslSupplementOptions),
+            q("我使用毒品", "I took drugs", bslSupplementOptions),
+            q("我未经医生处方使用镇静安眠药或止痛药，或即使有处方也服用超过剂量", "I took medication that had not been prescribed or, if prescribed, took more than the prescribed dose", bslSupplementOptions),
+            q("我控制不住地发怒，或出现以肢体攻击他人", "I had outbreaks of uncontrolled anger or physically attacked others", bslSupplementOptions),
+            q("我控制不住自己而与他人发生性行为，之后为此感到羞愧或生气", "I had uncontrollable sexual encounters of which I was later ashamed or which made me angry", bslSupplementOptions)
+        ),
+        bands = listOf(
+            b(0, 2, "none_low", "症状很少或没有", "None or low", "目前边缘型症状负担很低。如果仍有困扰，可以继续记录并和信任的人讨论。", "Current borderline symptom burden is none or low. If you are still troubled, keep tracking and talk with someone you trust."),
+            b(3, 10, "mild", "轻度症状负担", "Mild", "有一些边缘型相关症状。可以观察它们与压力、人际关系和睡眠的关系。", "Some borderline-related symptoms are present. Notice how they relate to stress, relationships and sleep."),
+            b(11, 18, "moderate", "中度症状负担", "Moderate", "症状负担处于中等水平，可能已经影响日常功能。建议和专业人员讨论。", "The symptom burden is moderate and may affect daily functioning. Consider discussing it with a professional."),
+            b(19, 26, "high", "较高症状负担", "High", "症状负担较高。建议尽快接受专业评估，并建立可用的支持与安全计划。", "The symptom burden is high. Seek professional assessment soon and build a support and safety plan."),
+            b(27, 34, "very_high", "很高症状负担", "Very high", "症状负担很高，可能需要更密集的支持。请与专业人员保持联系。", "The symptom burden is very high and may need more intensive support. Stay in contact with a professional."),
+            b(35, 40, "extremely_high", "极高症状负担", "Extremely high", "症状负担极高。请优先寻求专业帮助；如果出现伤害自己的念头，请立即联系信任的人或危机热线。", "The symptom burden is extremely high. Prioritise professional help; if you have thoughts of harming yourself, contact someone you trust or a crisis line now.")
+        ),
+        scoring = ScaleScoring.BSL23,
+        maxScoreOverride = 40,
+        scoreDivisor = 10,
+        scoredQuestionCount = 23,
+        supplementStartIndex = 23,
+        estimatedMinutes = 6,
+        featured = false,
+        source = "BSL-23: Bohus et al. (2009)；严重程度分级: Kleindienst et al. (2020)。中文版来自 ZI Mannheim 公开下载；电子版再分发前请确认授权。",
+        sourceEn = "BSL-23: Bohus et al. (2009); severity classification: Kleindienst et al. (2020). Chinese version from the ZI Mannheim public download; check permission before redistributing an electronic version.",
+        note = "得分是 23 个计分题的平均分；最后 11 题为不计分的行为补充项目。分级反映症状负担，不是边缘型人格障碍的诊断。",
+        noteEn = "The score is the mean of 23 scored items; the final 11 items are unscored behaviour supplements. The grades reflect symptom burden, not a diagnosis of borderline personality disorder.",
+        selfHarmQuestionIndex = 4,
+        riskQuestionIndices = listOf(6, 11, 17, 23, 24, 25)
+    )
+
+    private val iesrOptions = listOf(
+        o("完全没有", "Not at all", 0),
+        o("有一点", "A little bit", 1),
+        o("中等程度", "Moderately", 2),
+        o("相当多", "Quite a bit", 3),
+        o("极度", "Extremely", 4)
+    )
+
+    val iesr = ScaleDef(
+        type = "IESR",
+        name = "事件影响量表（IES-R）",
+        nameEn = "Impact of Event Scale-Revised (IES-R)",
+        shortName = "IES-R",
+        category = "创伤与应激",
+        categoryEn = "Trauma & stress",
+        description = "22 项自评，了解过去一周某件压力事件带来的侵入、回避与警觉反应。",
+        descriptionEn = "A 22-item measure of intrusion, avoidance and hyperarousal during the past week after a stressful event.",
+        timeframe = "过去 7 天",
+        timeframeEn = "Past 7 days",
+        instruction = "请回想过去一周里让你感到压力或痛苦的事件；如果有多个，请以最困扰你的一个为准。然后评定这些困难对你的困扰程度。",
+        instructionEn = "Think of a stressful or distressing event from the past week; if there were several, use the one that bothers you most. Rate how much each difficulty distressed you.",
+        questions = listOf(
+            q("任何提醒都会让我回想起与它有关的感受", "Any reminder brought back feelings about it", iesrOptions),
+            q("我难以保持睡眠", "I had trouble staying asleep", iesrOptions),
+            q("其他事情总让我想起它", "Other things kept making me think about it", iesrOptions),
+            q("我感到易怒和愤怒", "I felt irritable and angry", iesrOptions),
+            q("当我想到它或被提醒时，我会避免让自己难过", "I avoided letting myself get upset when I thought about it or was reminded of it", iesrOptions),
+            q("我会不由自主地想到它", "I thought about it when I didn't mean to", iesrOptions),
+            q("我觉得它仿佛没有发生过，或不真实", "I felt as if it hadn't happened or it wasn't real", iesrOptions),
+            q("我避开与它有关的提醒", "I stayed away from reminders of it", iesrOptions),
+            q("与它有关的画面会突然出现在我脑海中", "Pictures about it popped into my mind", iesrOptions),
+            q("我容易受惊", "I was jumpy and easily startled", iesrOptions),
+            q("我努力不去想它", "I tried not to think about it", iesrOptions),
+            q("我知道自己对它还有很多感受，但没有去处理", "I was aware that I still had a lot of feelings about it, but I didn't deal with them", iesrOptions),
+            q("我对它的感受有些麻木", "My feelings about it were kind of numb", iesrOptions),
+            q("我发现自己的行为或感受像回到了那个时候", "I found myself acting or feeling like I was back at that time", iesrOptions),
+            q("我难以入睡", "I had trouble falling asleep", iesrOptions),
+            q("我对它有一阵阵强烈的情绪", "I had waves of strong feelings about it", iesrOptions),
+            q("我试图把它从记忆中抹去", "I tried to remove it from my memory", iesrOptions),
+            q("我难以集中注意力", "I had trouble concentrating", iesrOptions),
+            q("与它有关的提醒会引起身体反应，比如出汗、呼吸困难、恶心或心跳加速", "Reminders of it caused me to have physical reactions, such as sweating, trouble breathing, nausea, or a pounding heart", iesrOptions),
+            q("我梦到过它", "I had dreams about it", iesrOptions),
+            q("我感到警觉、戒备", "I felt watchful and on-guard", iesrOptions),
+            q("我努力不去谈论它", "I tried not to talk about it", iesrOptions)
+        ),
+        bands = listOf(
+            b(0, 23, "low", "应激反应较低", "Low distress", "目前与事件相关的应激症状较轻。如果症状延迟出现或加重，可以再做一次。", "Event-related stress symptoms are currently low. If they emerge later or worsen, take it again."),
+            b(24, 32, "concern", "值得关注", "Worth attention", "达到 24 分及以上，创伤相关症状值得关注。建议和信任的人或专业人员谈谈。", "A score of 24 or more suggests trauma-related symptoms worth attention. Consider talking with someone you trust or a professional."),
+            b(33, 36, "probable", "可能达到 PTSD 筛查界值", "Possible PTSD threshold", "33 分及以上常被用作 PTSD 的可能界值。请由专业人员进一步评估。", "A score of 33 or more is often used as a probable PTSD threshold. Seek further assessment by a professional."),
+            b(37, 88, "severe", "应激反应较重", "High distress", "症状负担较重，建议尽快寻求专业评估与支持。", "The symptom burden is high. Seek professional assessment and support soon.")
+        ),
+        maxScoreOverride = 88,
+        estimatedMinutes = 5,
+        featured = false,
+        source = "IES-R: Weiss & Marmar (1997). 量表受版权保护；电子版再分发前需取得作者书面许可。",
+        sourceEn = "IES-R: Weiss & Marmar (1997). The scale is copyrighted; obtain written permission from the authors before redistributing an electronic version.",
+        note = "本应用不记录具体事件；请按最困扰你的事件作答。得分反映近一周的应激反应，不是 PTSD 诊断。",
+        noteEn = "The app does not record the specific event; answer about the event that troubles you most. The score reflects the past week and is not a PTSD diagnosis."
+    )
+
+    private val spinOptions = listOf(
+        o("完全不符合", "Not at all", 0),
+        o("有一点符合", "A little bit", 1),
+        o("有些符合", "Somewhat", 2),
+        o("非常符合", "Very much", 3),
+        o("极度符合", "Extremely", 4)
+    )
+
+    val spin = ScaleDef(
+        type = "SPIN",
+        name = "社交恐惧量表（SPIN）",
+        nameEn = "Social Phobia Inventory (SPIN)",
+        shortName = "SPIN",
+        category = "抑郁与焦虑",
+        categoryEn = "Depression & anxiety",
+        description = "17 项自评，了解过去一周社交焦虑相关的恐惧、回避与身体反应。",
+        descriptionEn = "A 17-item measure of fear, avoidance and physiological arousal related to social anxiety over the past week.",
+        timeframe = "过去一周",
+        timeframeEn = "Past week",
+        instruction = "请评定过去一周里，以下问题对你的困扰程度。",
+        instructionEn = "Rate how much each problem has bothered you during the past week.",
+        questions = listOf(
+            q("我害怕权威人士", "I am afraid of people in authority", spinOptions),
+            q("在别人面前脸红让我困扰", "I am bothered by blushing in front of people", spinOptions),
+            q("聚会和社交活动让我害怕", "Parties and social events scare me", spinOptions),
+            q("我避免和不认识的人说话", "I avoid talking to people I don't know", spinOptions),
+            q("被批评让我非常害怕", "Being criticized scares me a lot", spinOptions),
+            q("害怕尴尬使我避免做某些事或与人说话", "Fear of embarrassment causes me to avoid doing things or speaking to people", spinOptions),
+            q("在别人面前出汗让我痛苦", "Sweating in front of people causes me distress", spinOptions),
+            q("我避免参加聚会", "I avoid going to parties", spinOptions),
+            q("我避免参加成为众人注意焦点的活动", "I avoid activities in which I am the center of attention", spinOptions),
+            q("和陌生人说话让我害怕", "Talking to strangers scares me", spinOptions),
+            q("我避免必须发表演讲的场合", "I avoid having to give speeches", spinOptions),
+            q("为了避免被批评，我愿意做任何事", "I would do anything to avoid being criticized", spinOptions),
+            q("在人群中时，心悸让我困扰", "Heart palpitations bother me when I am around people", spinOptions),
+            q("当别人可能看着我时，我害怕做事", "I am afraid of doing things when people might be watching", spinOptions),
+            q("尴尬或显得愚蠢是我最害怕的事情之一", "Being embarrassed or looking stupid is among my worst fears", spinOptions),
+            q("我避免和任何权威人士说话", "I avoid speaking to anyone in authority", spinOptions),
+            q("在别人面前颤抖或发抖让我痛苦", "Trembling or shaking in front of others is distressing to me", spinOptions)
+        ),
+        bands = listOf(
+            b(0, 20, "none", "无明显社交焦虑", "No clear social anxiety", "得分低于常见筛查界值。如果仍然困扰你，可以和专业人员讨论。", "The score is below common screening thresholds. If it still troubles you, discuss it with a professional."),
+            b(21, 30, "mild", "轻度社交焦虑", "Mild", "有一些社交焦虑症状。可以记录触发情境，并练习逐步面对。", "Some social anxiety symptoms are present. Track triggers and consider gradual exposure practice."),
+            b(31, 40, "moderate", "中度社交焦虑", "Moderate", "社交焦虑可能已经影响生活。建议寻求专业评估。", "Social anxiety may be affecting your life. Consider professional assessment."),
+            b(41, 50, "severe", "重度社交焦虑", "Severe", "症状较重，建议尽快与专业人员讨论治疗方案。", "Symptoms are severe. Consider discussing treatment with a professional soon."),
+            b(51, 68, "very_severe", "极重度社交焦虑", "Very severe", "症状负担很重。请优先寻求专业帮助。", "The symptom burden is very severe. Prioritise professional help.")
+        ),
+        maxScoreOverride = 68,
+        estimatedMinutes = 3,
+        featured = false,
+        source = "SPIN: Connor et al. (2000). 量表受版权保护；再分发需取得版权方书面许可。",
+        sourceEn = "SPIN: Connor et al. (2000). The scale is copyrighted; written permission is required before redistribution.",
+        note = "19 分左右常被用作筛查参考；分数不是社交焦虑障碍的诊断。",
+        noteEn = "A score around 19 is often used as a screening reference; this is not a diagnosis of social anxiety disorder."
+    )
+
+    private val cssrsOptions = listOf(o("否", "No", 0), o("是", "Yes", 1))
+
+    val cssrs = ScaleDef(
+        type = "CSSRS",
+        name = "哥伦比亚自杀严重程度筛查（C-SSRS）",
+        nameEn = "Columbia-Suicide Severity Rating Scale (C-SSRS, screener)",
+        shortName = "C-SSRS",
+        category = "风险评估",
+        categoryEn = "Risk screening",
+        description = "6 个筛查问题，了解过去一个月的自杀意念与近三个月的自杀行为，并给出风险分层。",
+        descriptionEn = "Six screener questions about suicidal ideation in the past month and behaviour in the past three months, with risk triage.",
+        timeframe = "过去一个月（行为：过去 3 个月）",
+        timeframeEn = "Past month (behaviour: past 3 months)",
+        instruction = "请按最近的情况如实作答。任何一项为「是」都值得被认真对待，建议尽快告诉信任的人或专业人员。",
+        instructionEn = "Answer honestly about recent experiences. Any yes answer deserves attention; consider telling someone you trust or a professional soon.",
+        questions = listOf(
+            q("你是否希望自己已经死了，或希望自己睡着后不再醒来？", "Have you wished you were dead or wished you could go to sleep and not wake up?", cssrsOptions),
+            q("你是否真的有过自杀的念头？", "Have you actually had any thoughts of killing yourself?", cssrsOptions),
+            q("你是否想过可能怎样结束自己的生命？", "Have you thought about how you might do this?", cssrsOptions),
+            q("你是否对这些念头有过行动的意图（而不只是想想、确定自己不会去做）？", "Have you had any intention of acting on these thoughts of killing yourself, as opposed to you have the thoughts but you definitely would not act on them?", cssrsOptions),
+            q("你是否已经开始计划或想清楚结束生命的具体细节，并且打算实施？", "Have you started to work out, or actually worked out, the specific details of how to kill yourself and did you actually intend to carry out the details of your plan?", cssrsOptions),
+            q("你是否曾经做过任何事、开始做任何事或准备做任何事来结束自己的生命？", "Have you ever done anything, started to do anything, or prepared to do anything to end your life?", cssrsOptions),
+            q("如果上一题选「是」，这件事是否发生在过去 3 个月内？", "If you answered yes to the previous question, was this within the past three months?", listOf(o("不适用（上一题选「否」）", "Not applicable (previous answer was no)", 0), o("否", "No", 0), o("是", "Yes", 1)))
+        ),
+        bands = listOf(
+            b(0, 0, "negative", "没有阳性回答", "No positive answers", "目前没有筛查阳性回答。如果情绪变差，随时可以再做一次或联系信任的人。", "No positive answers right now. If things get worse, you can take this again or reach out to someone you trust."),
+            b(1, 7, "moderate", "需要进一步评估", "Further assessment needed", "有阳性回答，但未达到高风险条目。请尽快联系专业人员做更完整的风险评估。", "There are positive answers but no high-risk item. Contact a professional soon for a fuller risk assessment."),
+            b(1, 7, "high", "高风险，请立即寻求帮助", "High risk — seek help now", "第 4、5 题或近三个月的自杀行为为「是」，属于高风险。请不要独处，立即联系信任的人、专业人员或急救服务。", "A yes on item 4, 5 or recent suicidal behaviour indicates high risk. Do not stay alone; contact someone you trust, a professional, or emergency services now.")
+        ),
+        scoring = ScaleScoring.CSSRS,
+        maxScoreOverride = 6,
+        estimatedMinutes = 2,
+        featured = false,
+        source = "C-SSRS: Posner et al. (2011) / Columbia Lighthouse Project。社区与医疗场景可免费使用，但电子版实现可能需经 Columbia/RFMH 与 Clario 授权；发布前请确认。",
+        sourceEn = "C-SSRS: Posner et al. (2011) / Columbia Lighthouse Project. Free for community and healthcare use, but electronic implementations may require a license from Columbia/RFMH and Clario; confirm before release.",
+        note = "这是筛查，不是完整风险评估。任何阳性回答都应尽快由专业人员进一步评估。",
+        noteEn = "This is a screener, not a full risk assessment. Any positive answer should be followed up by a professional soon.",
+        selfHarmQuestionIndex = 1,
+        riskQuestionIndices = listOf(0, 2, 3, 4, 5, 6)
+    )
+
+    private val pqOptions = listOf(o("否", "False", 0), o("是", "True", 1))
+
+    val pq16 = ScaleDef(
+        type = "PQ16",
+        name = "精神病性体验筛查（PQ-16）",
+        nameEn = "Prodromal Questionnaire – 16 items (PQ-16)",
+        shortName = "PQ-16",
+        category = "精神病性体验",
+        categoryEn = "Psychotic experiences",
+        description = "16 项是/否筛查，了解近期可能的精神病性体验；阳性条目数达到 6 项时建议进一步评估。",
+        descriptionEn = "A 16-item yes/no screen for recent psychotic-like experiences; 6 or more positive items suggest further assessment.",
+        timeframe = "过去一个月",
+        timeframeEn = "Past month",
+        instruction = "请选择过去一个月里是否出现过以下体验。这里只统计「是」的条目数，不评价严重程度。",
+        instructionEn = "Choose whether each experience occurred in the past month. Only the number of yes answers is counted.",
+        questions = listOf(
+            q("我对过去喜欢的事情提不起兴趣", "I feel uninterested in the things I used to enjoy.", pqOptions),
+            q("我常常觉得经历的事情仿佛以前发生过（似曾相识）", "I often seem to live through events exactly as they happened before (déjà vu).", pqOptions),
+            q("我有时会闻到或尝到别人闻不到或尝不到的东西", "I sometimes smell or taste things that other people can't smell or taste.", pqOptions),
+            q("我经常听到不寻常的声音，比如敲击声、咔嗒声、嘶嘶声、拍手声或耳鸣", "I often hear unusual sounds like banging, clicking, hissing, clapping or ringing in my ears.", pqOptions),
+            q("我有时分不清自己的体验是真实的还是想象的", "I have been confused at times whether something I experienced was real or imaginary.", pqOptions),
+            q("当我看着某人或镜子里的自己时，我看到面孔在眼前发生变化", "When I look at a person, or look at myself in a mirror, I have seen the face change right before my eyes.", pqOptions),
+            q("初次见人时，我会极度焦虑", "I get extremely anxious when meeting people for the first time.", pqOptions),
+            q("我看到过别人显然看不到的东西", "I have seen things that other people apparently can't see.", pqOptions),
+            q("我的想法有时强烈到几乎能听见", "My thoughts are sometimes so strong that I can almost hear them.", pqOptions),
+            q("我有时会在广告、橱窗或周围物品的摆放中看出特殊含义", "I sometimes see special meanings in advertisements, shop windows, or in the way things are arranged around me.", pqOptions),
+            q("有时我觉得自己无法控制自己的想法或念头", "Sometimes I have felt that I'm not in control of my own ideas or thoughts.", pqOptions),
+            q("我有时会突然被远处的声音分散注意力，而平时不会注意到这些声音", "Sometimes I feel suddenly distracted by distant sounds that I am not normally aware of.", pqOptions),
+            q("我听到过别人听不到的声音，比如有人低语或说话", "I have heard things other people can't hear like voices of people whispering or talking.", pqOptions),
+            q("我常常觉得别人在针对我", "I often feel that others have it in for me.", pqOptions),
+            q("我有过某种人或力量在附近的感觉，即使我看不到任何人", "I have had the sense that some person or force is around me, even though I could not see anyone.", pqOptions),
+            q("我觉得身体的某些部位发生了变化，或运作方式与以前不同", "I feel that parts of my body have changed in some way, or that parts of my body are working differently than before.", pqOptions)
+        ),
+        bands = listOf(
+            b(0, 5, "below", "未达到常见筛查界值", "Below common screening threshold", "阳性条目少于 6 项。如果这些体验仍然困扰你，可以和专业人员讨论。", "Fewer than 6 positive items. If these experiences still trouble you, discuss them with a professional."),
+            b(6, 16, "above", "建议进一步评估", "Further assessment suggested", "阳性条目达到 6 项及以上，建议由熟悉精神病性体验的专业人员进一步评估。这并不是诊断。", "Six or more positive items suggest further assessment by a professional familiar with psychotic experiences. This is not a diagnosis.")
+        ),
+        maxScoreOverride = 16,
+        estimatedMinutes = 3,
+        featured = false,
+        source = "PQ-16: Ising et al. (2012) / Loewy et al. (2005). 量表公开发表；电子或商业再分发前建议联系开发者确认许可。",
+        sourceEn = "PQ-16: Ising et al. (2012) / Loewy et al. (2005). Published openly; confirm permission with the developers before electronic or commercial redistribution.",
+        note = "结果只统计「是」的条目数，不代表诊断。睡眠不足、压力或物质使用也可能造成类似体验。",
+        noteEn = "The result counts yes answers and is not a diagnosis. Sleep loss, stress or substance use can also cause similar experiences."
+    )
+
+    private val essOptions = listOf(
+        o("从不打瞌睡", "Would never doze", 0),
+        o("轻微可能", "Slight chance of dozing", 1),
+        o("中等可能", "Moderate chance of dozing", 2),
+        o("很大可能", "High chance of dozing", 3)
+    )
+
+    val ess = ScaleDef(
+        type = "ESS",
+        name = "日间嗜睡量表（ESS）",
+        nameEn = "Epworth Sleepiness Scale (ESS)",
+        shortName = "ESS",
+        category = "睡眠",
+        categoryEn = "Sleep",
+        description = "8 项自评，了解日常生活中打瞌睡的可能性。",
+        descriptionEn = "An 8-item measure of the likelihood of dozing in everyday situations.",
+        timeframe = "近期通常情况",
+        timeframeEn = "Usual way of life recently",
+        instruction = "请判断在以下情境中打瞌睡或睡着的可能性（不是仅仅感到疲倦）。即使最近没有做过这些事，也请估计当时会怎样。",
+        instructionEn = "Rate the likelihood of dozing or falling asleep (not just feeling tired) in each situation. Even if you have not done some recently, estimate how they would have affected you.",
+        questions = listOf(
+            q("坐着阅读时", "Sitting and reading", essOptions),
+            q("看电视时", "Watching TV", essOptions),
+            q("在公共场所坐着不动时（如剧院或会议）", "Sitting, inactive in a public place (e.g. a theater or a meeting)", essOptions),
+            q("乘车一小时以上不休息时", "As a passenger in a car for an hour without a break", essOptions),
+            q("下午躺下休息时（条件允许）", "Lying down to rest in the afternoon when circumstances permit", essOptions),
+            q("坐着与人交谈时", "Sitting and talking to someone", essOptions),
+            q("午饭后安静坐着（未饮酒）时", "Sitting quietly after a lunch without alcohol", essOptions),
+            q("开车时遇到堵车停了几分钟时", "In a car, while stopped for a few minutes in the traffic", essOptions)
+        ),
+        bands = listOf(
+            b(0, 5, "lower_normal", "日间嗜睡较低", "Lower normal daytime sleepiness", "日间嗜睡程度较低。", "Daytime sleepiness is in the lower normal range."),
+            b(6, 10, "higher_normal", "日间嗜睡偏高但仍在常见范围", "Higher normal daytime sleepiness", "日间嗜睡偏高。可以留意睡眠时长、作息规律和药物影响。", "Daytime sleepiness is in the higher normal range. Notice sleep duration, schedule regularity and medication effects."),
+            b(11, 12, "mild", "轻度日间嗜睡", "Mild excessive daytime sleepiness", "达到 11 分及以上，属于日间嗜睡偏高。建议与医生讨论睡眠和药物因素。", "A score of 11 or more suggests excessive daytime sleepiness. Discuss sleep and medication factors with a doctor."),
+            b(13, 15, "moderate", "中度日间嗜睡", "Moderate excessive daytime sleepiness", "中度日间嗜睡，建议进一步评估睡眠障碍或药物影响。", "Moderate excessive daytime sleepiness. Consider assessment for sleep disorders or medication effects."),
+            b(16, 24, "severe", "重度日间嗜睡", "Severe excessive daytime sleepiness", "重度日间嗜睡，建议尽快寻求专业评估；开车或操作机械时请格外小心。", "Severe excessive daytime sleepiness. Seek professional assessment soon and take extra care when driving or operating machinery.")
+        ),
+        maxScoreOverride = 24,
+        estimatedMinutes = 2,
+        featured = false,
+        source = "ESS © M.W. Johns 1990–1997。任何使用均需通过 Mapi Research Trust 取得许可；发布前请确认。",
+        sourceEn = "ESS © M.W. Johns 1990–1997. Any use requires a license through Mapi Research Trust; confirm before release.",
+        note = "本结果只反映打瞌睡的可能性，不是嗜睡症的诊断。",
+        noteEn = "This reflects the likelihood of dozing, not a diagnosis of a sleep disorder."
+    )
+
+    private val mspssOptions = listOf(
+        o("非常不同意", "Very strongly disagree", 1),
+        o("不同意", "Strongly disagree", 2),
+        o("有点不同意", "Mildly disagree", 3),
+        o("中立", "Neutral", 4),
+        o("有点同意", "Mildly agree", 5),
+        o("同意", "Strongly agree", 6),
+        o("非常同意", "Very strongly agree", 7)
+    )
+
+    val mspss = ScaleDef(
+        type = "MSPSS",
+        name = "领悟社会支持量表（MSPSS）",
+        nameEn = "Multidimensional Scale of Perceived Social Support (MSPSS)",
+        shortName = "MSPSS",
+        category = "社会与功能",
+        categoryEn = "Social & functioning",
+        description = "12 项自评，了解来自特别的人、家人和朋友的社会支持。",
+        descriptionEn = "A 12-item measure of perceived support from a significant other, family and friends.",
+        timeframe = "目前",
+        timeframeEn = "Right now",
+        instruction = "请阅读每句话，选择最符合你当前感受的选项。",
+        instructionEn = "Read each statement and choose how you feel about it right now.",
+        questions = listOf(
+            q("在我需要时，有一个特别的人会在我身边", "There is a special person who is around when I am in need.", mspssOptions),
+            q("有一个特别的人，我可以和他/她分享快乐与悲伤", "There is a special person with whom I can share joys and sorrows.", mspssOptions),
+            q("我的家人真的尽力帮助我", "My family really tries to help me.", mspssOptions),
+            q("我能从家人那里得到我需要的情感帮助与支持", "I get the emotional help and support I need from my family.", mspssOptions),
+            q("有一个特别的人是我真正的安慰来源", "I have a special person who is a real source of comfort to me.", mspssOptions),
+            q("我的朋友真的尽力帮助我", "My friends really try to help me.", mspssOptions),
+            q("事情不顺利时，我可以依靠我的朋友", "I can count on my friends when things go wrong.", mspssOptions),
+            q("我可以和家人谈论我的问题", "I can talk about my problems with my family.", mspssOptions),
+            q("我有可以分享快乐与悲伤的朋友", "I have friends with whom I can share my joys and sorrows.", mspssOptions),
+            q("我的生活中有这样一个特别的人，在乎我的感受", "There is a special person in my life who cares about my feelings.", mspssOptions),
+            q("我的家人愿意帮助我做决定", "My family is willing to help me make decisions.", mspssOptions),
+            q("我可以和朋友谈论我的问题", "I can talk about my problems with my friends.", mspssOptions)
+        ),
+        bands = listOf(
+            b(12, 35, "low", "社会支持偏低", "Low support", "你感受到的社会支持偏低。可以想想身边可联系的人，或从小范围的联络开始。", "Perceived social support is low. Think about people you could reach out to, even in a small way."),
+            b(36, 60, "moderate", "社会支持中等", "Moderate support", "你感受到中等程度的社会支持。可以继续维护重要的人际联系。", "Perceived social support is moderate. Keep nurturing the relationships that matter to you."),
+            b(61, 84, "high", "社会支持较高", "High support", "你感受到较高的社会支持。遇到困难时，记得主动使用这些支持。", "Perceived social support is high. Remember to use these supports when things are hard.")
+        ),
+        maxScoreOverride = 84,
+        estimatedMinutes = 3,
+        featured = false,
+        source = "MSPSS: Zimet et al. (1988). 可免费使用，请保留引用。",
+        sourceEn = "MSPSS: Zimet et al. (1988). Free to use with attribution.",
+        note = "总分只反映你主观感受到的支持，不代表实际有多少人可依靠。",
+        noteEn = "The total reflects perceived support, not the actual number of people available to you."
+    )
+
+    private val ffmqOptions = listOf(
+        o("从不或极少符合", "Never or very rarely true", 1),
+        o("很少符合", "Rarely true", 2),
+        o("有时符合", "Sometimes true", 3),
+        o("经常符合", "Often true", 4),
+        o("非常经常或总是符合", "Very often or always true", 5)
+    )
+
+    private val ffmqReverseOptions = listOf(
+        o("从不或极少符合", "Never or very rarely true", 5),
+        o("很少符合", "Rarely true", 4),
+        o("有时符合", "Sometimes true", 3),
+        o("经常符合", "Often true", 2),
+        o("非常经常或总是符合", "Very often or always true", 1)
+    )
+
+    val ffmq39 = ScaleDef(
+        type = "FFMQ39",
+        name = "五因素正念量表（FFMQ-39）",
+        nameEn = "Five Facet Mindfulness Questionnaire (FFMQ-39)",
+        shortName = "FFMQ-39",
+        category = "压力与适应",
+        categoryEn = "Stress & adjustment",
+        description = "39 项自评，了解观察、描述、觉知行动、不评判和不反应五个正念维度。",
+        descriptionEn = "A 39-item measure of observing, describing, acting with awareness, nonjudging and nonreactivity.",
+        timeframe = "通常情况",
+        timeframeEn = "In general",
+        instruction = "请根据以下描述通常与你相符的程度作答。答案没有对错，请按真实体验选择。",
+        instructionEn = "Rate how true each statement is for you in general. There are no right or wrong answers.",
+        questions = listOf(
+            q("走路时，我会刻意留意身体移动的感觉", "When I'm walking, I deliberately notice the sensations of my body moving.", ffmqOptions),
+            q("我善于用词语描述自己的感受", "I'm good at finding words to describe my feelings.", ffmqOptions),
+            q("我会因为自己有不合理或不恰当的情绪而批评自己", "I criticize myself for having irrational or inappropriate emotions.", ffmqReverseOptions),
+            q("我能察觉自己的感受和情绪，而不必对它们作出反应", "I perceive my feelings and emotions without having to react to them.", ffmqOptions),
+            q("我做事情时，思绪会飘走，容易分心", "When I do things, my mind wanders off and I'm easily distracted.", ffmqReverseOptions),
+            q("洗澡或泡澡时，我会留意水接触身体的感觉", "When I take a shower or bath, I stay alert to the sensations of water on my body.", ffmqOptions),
+            q("我能轻松地用语言表达自己的信念、观点和期望", "I can easily put my beliefs, opinions, and expectations into words.", ffmqOptions),
+            q("我因为做白日梦、担心或其他分心而没有注意自己在做什么", "I don't pay attention to what I'm doing because I'm daydreaming, worrying, or otherwise distracted.", ffmqReverseOptions),
+            q("我观察自己的感受，而不会陷进去", "I watch my feelings without getting lost in them.", ffmqOptions),
+            q("我会告诉自己不该有现在的感受", "I tell myself I shouldn't be feeling the way I'm feeling.", ffmqReverseOptions),
+            q("我会留意食物和饮料如何影响我的想法、身体感觉和情绪", "I notice how foods and drinks affect my thoughts, bodily sensations, and emotions.", ffmqOptions),
+            q("我很难找到词语来描述自己正在想什么", "It's hard for me to find the words to describe what I'm thinking.", ffmqReverseOptions),
+            q("我很容易分心", "I am easily distracted.", ffmqReverseOptions),
+            q("我相信自己有些想法是不正常或不好的，不该那样想", "I believe some of my thoughts are abnormal or bad and I shouldn't think that way.", ffmqReverseOptions),
+            q("我会留意风拂过头发或阳光照在脸上的感觉", "I pay attention to sensations, such as the wind in my hair or sun on my face.", ffmqOptions),
+            q("我很难想到合适的词语来表达自己对事物的感受", "I have trouble thinking of the right words to express how I feel about things.", ffmqReverseOptions),
+            q("我会判断自己的想法是好是坏", "I make judgments about whether my thoughts are good or bad.", ffmqReverseOptions),
+            q("我很难专注于当下正在发生的事情", "I find it difficult to stay focused on what's happening in the present.", ffmqReverseOptions),
+            q("当出现令人痛苦的想法或画面时，我会「退后一步」，觉察它而不被它吞没", "When I have distressing thoughts or images, I “step back” and am aware of the thought or image without getting taken over by it.", ffmqOptions),
+            q("我会留意声音，比如钟表滴答、鸟鸣或车辆经过", "I pay attention to sounds, such as clocks ticking, birds chirping, or cars passing.", ffmqOptions),
+            q("在困难情境中，我能暂停一下，而不立即作出反应", "In difficult situations, I can pause without immediately reacting.", ffmqOptions),
+            q("当身体出现某种感觉时，我很难描述它，因为找不到合适的词", "When I have a sensation in my body, it's difficult for me to describe it because I can't find the right words.", ffmqReverseOptions),
+            q("我似乎处于「自动运行」状态，对自己的所作所为不太有觉察", "It seems I am “running on automatic” without much awareness of what I'm doing.", ffmqReverseOptions),
+            q("当出现令人痛苦的想法或画面时，我很快会平静下来", "When I have distressing thoughts or images, I feel calm soon after.", ffmqOptions),
+            q("我会告诉自己不该那样想", "I tell myself that I shouldn't be thinking the way I'm thinking.", ffmqReverseOptions),
+            q("我会留意事物的气味和香气", "I notice the smells and aromas of things.", ffmqOptions),
+            q("即使我非常难过，我也能找到方法把它说出来", "Even when I'm feeling terribly upset, I can find a way to put it into words.", ffmqOptions),
+            q("我会匆忙完成任务，而没有真正留意它们", "I rush through activities without being really attentive to them.", ffmqReverseOptions),
+            q("当出现令人痛苦的想法或画面时，我能只是觉察它们而不作出反应", "When I have distressing thoughts or images I am able just to notice them without reacting.", ffmqOptions),
+            q("我认为自己有些情绪是不好或不恰当的，不该有这些感受", "I think some of my emotions are bad or inappropriate and I shouldn't feel them.", ffmqReverseOptions),
+            q("我会留意艺术或自然中的视觉元素，比如颜色、形状、纹理或光影图案", "I notice visual elements in art or nature, such as colors, shapes, textures, or patterns of light and shadow.", ffmqOptions),
+            q("我的自然倾向是用语言描述自己的经历", "My natural tendency is to put my experiences into words.", ffmqOptions),
+            q("当出现令人痛苦的想法或画面时，我只是觉察它们，然后让它们离开", "When I have distressing thoughts or images, I just notice them and let them go.", ffmqOptions),
+            q("我做工作或任务时会自动完成，而不太清楚自己在做什么", "I do jobs or tasks automatically without being aware of what I'm doing.", ffmqReverseOptions),
+            q("当出现令人痛苦的想法或画面时，我会根据内容判断自己好或不好", "When I have distressing thoughts or images, I judge myself as good or bad, depending what the thought/image is about.", ffmqReverseOptions),
+            q("我会留意自己的情绪如何影响想法和行为", "I pay attention to how my emotions affect my thoughts and behavior.", ffmqOptions),
+            q("我通常能相当详细地描述自己此刻的感受", "I can usually describe how I feel at the moment in considerable detail.", ffmqOptions),
+            q("我发现自己做事时没有留心", "I find myself doing things without paying attention.", ffmqReverseOptions),
+            q("当我有不合理的想法时，我会否定自己", "I disapprove of myself when I have irrational ideas.", ffmqReverseOptions)
+        ),
+        bands = listOf(
+            b(39, 91, "lower", "正念水平较低", "Lower mindfulness", "总体来说，正念特质得分较低。可以尝试短时的呼吸觉察或身体扫描练习。", "Overall mindfulness scores are lower. Try brief breath-awareness or body-scan practices."),
+            b(92, 143, "moderate", "正念水平中等", "Moderate mindfulness", "正念特质得分处于中等范围。不同维度的差异可能比总分更有意义。", "Mindfulness scores are moderate. Facet differences may be more meaningful than the total."),
+            b(144, 195, "higher", "正念水平较高", "Higher mindfulness", "正念特质得分较高。继续留意各维度是否均衡发展。", "Mindfulness scores are higher. Keep noticing whether the facets are developing evenly.")
+        ),
+        maxScoreOverride = 195,
+        estimatedMinutes = 8,
+        featured = false,
+        source = "FFMQ: Baer et al. (2006)。作者公开提供量表用于研究；电子或商业再分发前请联系作者确认。",
+        sourceEn = "FFMQ: Baer et al. (2006). The authors provide the scale openly for research; confirm permission before electronic or commercial redistribution.",
+        note = "FFMQ 没有公认的诊断界值，总分只作自我观察；五个维度建议分别理解。",
+        noteEn = "The FFMQ has no validated diagnostic cutoffs; the total is for self-observation and the five facets should be interpreted separately."
+    )
+
+    private val dersOptions = listOf(
+        o("几乎从不（0–10%）", "Almost never (0–10%)", 1),
+        o("有时（11–35%）", "Sometimes (11–35%)", 2),
+        o("大约一半时间（36–65%）", "About half the time (36–65%)", 3),
+        o("大部分时间（66–90%）", "Most of the time (66–90%)", 4),
+        o("几乎总是（91–100%）", "Almost always (91–100%)", 5)
+    )
+
+    private val dersReverseOptions = listOf(
+        o("几乎从不（0–10%）", "Almost never (0–10%)", 5),
+        o("有时（11–35%）", "Sometimes (11–35%)", 4),
+        o("大约一半时间（36–65%）", "About half the time (36–65%)", 3),
+        o("大部分时间（66–90%）", "Most of the time (66–90%)", 2),
+        o("几乎总是（91–100%）", "Almost always (91–100%)", 1)
+    )
+
+    val ders36 = ScaleDef(
+        type = "DERS36",
+        name = "情绪调节困难量表（DERS-36）",
+        nameEn = "Difficulties in Emotion Regulation Scale (DERS-36)",
+        shortName = "DERS-36",
+        category = "人格与情绪调节",
+        categoryEn = "Personality & emotion regulation",
+        description = "36 项自评，了解情绪的不接受、目标受阻、冲动控制、觉察、调节策略与清晰度六个维度。",
+        descriptionEn = "A 36-item measure of nonacceptance, goal difficulties, impulse control, awareness, strategies and clarity in emotion regulation.",
+        timeframe = "通常情况",
+        timeframeEn = "In general",
+        instruction = "请按以下情况在你身上出现的频率作答。答案没有对错，请按真实体验选择。",
+        instructionEn = "Rate how often each statement applies to you. There are no right or wrong answers.",
+        questions = listOf(
+            q("我很清楚自己的感受", "I am clear about my feelings.", dersReverseOptions),
+            q("我会留意自己的感受", "I pay attention to how I feel.", dersReverseOptions),
+            q("我体验到的情绪让我不堪重负、失去控制", "I experience my emotions as overwhelming and out of control.", dersOptions),
+            q("我不知道自己有什么感受", "I have no idea how I am feeling.", dersOptions),
+            q("我很难理解自己的感受", "I have difficulty making sense out of my feelings.", dersOptions),
+            q("我关注自己的感受", "I am attentive to my feelings.", dersReverseOptions),
+            q("我确切知道自己有什么感受", "I know exactly how I am feeling.", dersReverseOptions),
+            q("我在意自己的感受", "I care about what I am feeling.", dersReverseOptions),
+            q("我对自己的感受感到困惑", "I am confused about how I feel.", dersOptions),
+            q("当我难过时，我能承认自己的情绪", "When I'm upset, I acknowledge my emotions.", dersReverseOptions),
+            q("当我难过时，我会因为自己有这种感受而生自己的气", "When I'm upset, I become angry with myself for feeling that way.", dersOptions),
+            q("当我难过时，我会因为自己有这种感受而感到尴尬", "When I'm upset, I become embarrassed for feeling that way.", dersOptions),
+            q("当我难过时，我很难完成工作", "When I'm upset, I have difficulty getting work done.", dersOptions),
+            q("当我难过时，我会失控", "When I'm upset, I become out of control.", dersOptions),
+            q("当我难过时，我相信自己会长时间保持这种状态", "When I'm upset, I believe that I will remain that way for a long time.", dersOptions),
+            q("当我难过时，我相信自己最终会变得非常抑郁", "When I'm upset, I believe that I'll end up feeling very depressed.", dersOptions),
+            q("当我难过时，我相信自己的感受是合理且重要的", "When I'm upset, I believe that my feelings are valid and important.", dersReverseOptions),
+            q("当我难过时，我很难专注于其他事情", "When I'm upset, I have difficulty focusing on other things.", dersOptions),
+            q("当我难过时，我感到失控", "When I'm upset, I feel out of control.", dersOptions),
+            q("当我难过时，我仍然能完成任务", "When I'm upset, I can still get things done.", dersReverseOptions),
+            q("当我难过时，我会因为自己有这种感受而感到羞耻", "When I'm upset, I feel ashamed with myself for feeling that way.", dersOptions),
+            q("当我难过时，我知道自己最终能找到方法感觉好一些", "When I'm upset, I know that I can find a way to eventually feel better.", dersReverseOptions),
+            q("当我难过时，我觉得自己很软弱", "When I'm upset, I feel like I am weak.", dersOptions),
+            q("当我难过时，我觉得自己能控制自己的行为", "When I'm upset, I feel like I can remain in control of my behaviors.", dersReverseOptions),
+            q("当我难过时，我会因为自己有这种感受而内疚", "When I'm upset, I feel guilty for feeling that way.", dersOptions),
+            q("当我难过时，我很难集中注意力", "When I'm upset, I have difficulty concentrating.", dersOptions),
+            q("当我难过时，我很难控制自己的行为", "When I'm upset, I have difficulty controlling my behaviors.", dersOptions),
+            q("当我难过时，我相信自己做什么都无法让自己好受一些", "When I'm upset, I believe that there is nothing I can do to make myself feel better.", dersOptions),
+            q("当我难过时，我会因为自己有这种感受而烦躁", "When I'm upset, I become irritated with myself for feeling that way.", dersOptions),
+            q("当我难过时，我开始对自己感觉非常糟糕", "When I'm upset, I start to feel very bad about myself.", dersOptions),
+            q("当我难过时，我相信自己只能沉溺其中", "When I'm upset, I believe that wallowing in it is all I can do.", dersOptions),
+            q("当我难过时，我失去对行为的控制", "When I'm upset, I lose control over my behaviors.", dersOptions),
+            q("当我难过时，我很难思考其他任何事情", "When I'm upset, I have difficulty thinking about anything else.", dersOptions),
+            q("当我难过时，我会花时间弄清楚自己真正的感受", "When I'm upset, I take time to figure out what I'm really feeling.", dersReverseOptions),
+            q("当我难过时，我需要很长时间才能感觉好一些", "When I'm upset, it takes me a long time to feel better.", dersOptions),
+            q("当我难过时，我的情绪让我不堪重负", "When I'm upset, my emotions feel overwhelming.", dersOptions)
+        ),
+        bands = listOf(
+            b(36, 84, "lower", "情绪调节困难较少", "Lower difficulties", "情绪调节困难相对较少。如果仍有明显情绪波动，可以继续记录触发情境。", "Emotion-regulation difficulties are relatively low. If mood swings still bother you, keep tracking triggers."),
+            b(85, 132, "moderate", "中等程度情绪调节困难", "Moderate difficulties", "情绪调节困难处于中等水平。可以练习识别情绪、暂停和寻求支持。", "Emotion-regulation difficulties are moderate. Practice naming feelings, pausing, and seeking support."),
+            b(133, 180, "higher", "较高程度情绪调节困难", "Higher difficulties", "情绪调节困难较明显，可能影响日常生活。建议与专业人员讨论，尤其是情绪失控或自伤念头出现时。", "Emotion-regulation difficulties are higher and may affect daily life. Discuss them with a professional, especially if emotions feel out of control or self-harm thoughts appear.")
+        ),
+        maxScoreOverride = 180,
+        estimatedMinutes = 7,
+        featured = false,
+        source = "DERS: Gratz & Roemer (2004). 非商业临床与研究使用通常免费；商业或电子再分发前请与作者/出版方确认。",
+        sourceEn = "DERS: Gratz & Roemer (2004). Usually free for non-commercial clinical and research use; confirm with the authors/publisher before commercial or electronic redistribution.",
+        note = "DERS 没有公认的诊断界值，分数越高表示情绪调节困难越多；六个维度建议分别理解。",
+        noteEn = "The DERS has no universally accepted diagnostic cutoff; higher scores indicate more emotion-regulation difficulty. Interpret the six facets separately."
+    )
+
+    private val shapsOptions = listOf(
+        o("非常同意", "Strongly agree", 0),
+        o("同意", "Agree", 0),
+        o("不同意", "Disagree", 1),
+        o("非常不同意", "Strongly disagree", 1)
+    )
+
+    val shaps = ScaleDef(
+        type = "SHAPS",
+        name = "快感缺失量表（SHAPS）",
+        nameEn = "Snaith-Hamilton Pleasure Scale (SHAPS)",
+        shortName = "SHAPS",
+        category = "抑郁与焦虑",
+        categoryEn = "Depression & anxiety",
+        description = "14 项自评，了解体验快乐的能力；总分越高表示快感缺失越明显。",
+        descriptionEn = "A 14-item measure of hedonic tone; higher scores indicate greater anhedonia.",
+        timeframe = "目前",
+        timeframeEn = "Right now",
+        instruction = "请阅读每句话，选择你同意或不同意的程度。请按你最近的实际感受作答。",
+        instructionEn = "Read each statement and choose how much you agree or disagree, based on how you have felt recently.",
+        questions = listOf(
+            q("我会享受自己最喜欢的电视或广播节目", "I would enjoy my favourite television or radio programme.", shapsOptions),
+            q("我会享受与家人或亲密朋友在一起", "I would enjoy being with my family or close friends.", shapsOptions),
+            q("我会从自己的爱好和消遣中找到乐趣", "I would find pleasure in my hobbies and pastimes.", shapsOptions),
+            q("我能享受自己最喜欢的一餐", "I would be able to enjoy my favourite meal.", shapsOptions),
+            q("我会享受一个热水澡或清爽的淋浴", "I would enjoy a warm bath or refreshing shower.", shapsOptions),
+            q("我会从花香、海边清新的空气或新烤面包的气味中找到乐趣", "I would find pleasure in the scent of flowers or the smell of a fresh sea breeze or freshly baked bread.", shapsOptions),
+            q("我会享受看到别人微笑的脸", "I would enjoy seeing other people's smiling faces.", shapsOptions),
+            q("当我用心打扮后，我会享受自己看起来精神的样子", "I would enjoy looking smart when I have made an effort with my appearance.", shapsOptions),
+            q("我会享受读书、杂志或报纸", "I would enjoy reading a book, magazine or newspaper.", shapsOptions),
+            q("我会享受一杯茶、咖啡或我最喜欢的饮料", "I would enjoy a cup of tea or coffee or my favorite drink.", shapsOptions),
+            q("我会从小事中找到乐趣，比如晴朗的阳光、朋友打来的电话", "I would find pleasure in small things, e.g. bright sunny day, a telephone call from a friend.", shapsOptions),
+            q("我能享受美丽的风景", "I would be able to enjoy a beautiful landscape or view.", shapsOptions),
+            q("我会从帮助别人中获得乐趣", "I would get pleasure from helping others.", shapsOptions),
+            q("当我得到别人的称赞时，我会感到愉快", "I would feel pleasure when I receive praise from other people.", shapsOptions)
+        ),
+        bands = listOf(
+            b(0, 2, "normal", "没有明显快感缺失", "No clear anhedonia", "你目前仍能从日常事物中体验到快乐。", "You can still experience pleasure from everyday things."),
+            b(3, 5, "mild", "可能存在轻度快感缺失", "Possible mild anhedonia", "得分达到常见界值，可能有轻度快感缺失。可以观察它是否持续两周以上。", "The score reaches the common threshold, suggesting possible mild anhedonia. Notice whether it lasts more than two weeks."),
+            b(6, 14, "significant", "快感缺失较明显", "Significant anhedonia", "体验快乐的能力明显下降。建议与专业人员讨论，尤其是同时存在情绪低落或兴趣丧失时。", "The ability to experience pleasure is noticeably reduced. Discuss it with a professional, especially alongside low mood or loss of interest.")
+        ),
+        maxScoreOverride = 14,
+        estimatedMinutes = 3,
+        featured = false,
+        source = "SHAPS: Snaith et al. (1995). 个人使用与研究可复制；商业用途需与 British Journal of Psychiatry 协商。",
+        sourceEn = "SHAPS: Snaith et al. (1995). Reproduction for personal use and research is permitted; commercial use must be negotiated with the British Journal of Psychiatry.",
+        note = "3 分及以上常被视为快感缺失的参考界值；分数不是抑郁症的诊断。",
+        noteEn = "A score of 3 or more is commonly used as a reference threshold for anhedonia; this is not a diagnosis of depression."
+    )
+
     private val asrsFreq = listOf(o("从不", "Never", 0), o("很少", "Rarely", 1), o("有时", "Sometimes", 2), o("经常", "Often", 3), o("非常频繁", "Very often", 4))
 
     val asrs18 = ScaleDef(
@@ -1973,46 +2740,50 @@ object ScaleCatalog {
         shortName = "ASRS-18",
         category = "注意力与其他",
         categoryEn = "Attention & other",
-        description = "18 项完整症状清单，分为注意力不集中与冲动/多动两个维度；得分是「经常/非常频繁」的条目数。",
-        descriptionEn = "The full 18-item symptom checklist with inattention and hyperactivity-impulsivity subscales; the score counts items rated often or very often.",
+        description = "18 项完整症状清单，A 部分（注意力不集中）与 B 部分（冲动/多动）各 9 题，分别计算 0–36 分，分级取较高的一部分。",
+        descriptionEn = "The full 18-item symptom checklist with 9 inattention items (Part A) and 9 hyperactivity-impulsivity items (Part B), each scored 0–36; the higher part determines the band.",
         timeframe = "过去六个月",
         timeframeEn = "Over the past six months",
-        instruction = "请按过去六个月的情况选择频率；只有「经常 / 非常频繁」才计入症状数。",
-        instructionEn = "Choose the frequency for the past six months; only often or very often count as symptoms.",
+        instruction = "请按过去六个月的情况选择频率。A、B 两部分分别把频率分数相加（0–4 分），不是统计「经常」的条目数。",
+        instructionEn = "Rate the past six months. Sum the 0–4 frequency scores within Part A and Part B separately; do not count the number of often responses.",
         questions = listOf(
-            q("难以专注细节，或做事粗心大意", "Fail to give close attention to details or make careless mistakes", asrsFreq),
-            q("难以在任务中保持持续专注", "Have difficulty sustaining attention in tasks or activities", asrsFreq),
-            q("别人直接对你说话时，难以专心听", "Do not seem to listen when spoken to directly", asrsFreq),
-            q("难以完成收尾、把细节做完", "Fail to finish details, or do not follow through on instructions", asrsFreq),
-            q("难以组织任务和活动", "Have difficulty organizing tasks and activities", asrsFreq),
-            q("回避或拖延需要持续用脑的任务", "Avoid or delay tasks that require sustained mental effort", asrsFreq),
-            q("经常丢东西（钥匙、手机、文件等）", "Lose things necessary for tasks or activities", asrsFreq),
-            q("容易被外界声音或画面分心", "Are easily distracted by extraneous stimuli", asrsFreq),
-            q("忘记日常事务（预约、缴费、回消息）", "Are forgetful in daily activities", asrsFreq),
-            q("坐着时手脚动来动去，或扭动身体", "Fidget or squirm with your hands or feet", asrsFreq),
-            q("需要坐着的场合难以保持坐姿", "Leave your seat in situations where remaining seated is expected", asrsFreq),
-            q("感到坐立不安、静不下来", "Feel restless or fidgety", asrsFreq),
-            q("难以安静地休闲或玩", "Have difficulty engaging in leisure activities quietly", asrsFreq),
-            q("像被马达驱动一样，停不下来", "Feel on the go, as if driven by a motor", asrsFreq),
-            q("话比一般人多", "Talk excessively", asrsFreq),
-            q("问题还没问完就抢着回答", "Blurt out answers before questions are completed", asrsFreq),
-            q("难以等待轮到自己", "Have difficulty awaiting your turn", asrsFreq),
-            q("打断或打扰别人（插话、插队）", "Interrupt or intrude on others", asrsFreq),
+            q("当必须进行一件枯燥或困难的计划时，你会多常粗心犯错？", "How often do you make careless mistakes when you have to work on a boring or difficult project?", asrsFreq),
+            q("当正在做枯燥或重复性的工作时，你多常有持续专注的困难？", "How often do you have difficulty keeping your attention when you are doing boring or repetitive work?", asrsFreq),
+            q("即使有人直接对你说话，你会多常有困难专注于别人跟你讲话的内容？", "How often do you have difficulty concentrating on what people say to you, even when they are speaking to you directly?", asrsFreq),
+            q("一旦完成任何计划中最具挑战的部分之后，你多常有完成计划最后细节的困难？", "How often do you have trouble wrapping up the final details of a project, once the challenging parts have been done?", asrsFreq),
+            q("当必须从事需要有组织规划性的任务时，你会多常有困难井然有序地去做？", "How often do you have difficulty getting things in order when you have to do a task that requires organization?", asrsFreq),
+            q("当有一件需要多费心思考的工作时，你会多常逃避或是延后开始去做？", "When you have a task that requires a lot of thought, how often do you avoid or delay getting started?", asrsFreq),
+            q("在家里或是在工作时，你会多常没有把东西放对地方或是找不到东西？", "How often do you misplace or have difficulty finding things at home or at work?", asrsFreq),
+            q("你会多常因身旁的活动或声音而分心？", "How often are you distracted by activity or noise around you?", asrsFreq),
+            q("你会多常有困难去记得约会或是必须要做的事？", "How often do you have problems remembering appointments or obligations?", asrsFreq),
+            q("当你必须长时间坐着时，你会多常坐不安稳或扭动手脚？", "How often do you fidget or squirm with your hands or feet when you have to sit down for a long time?", asrsFreq),
+            q("你会多常在开会时或在其他被期待坐好的场合中离开座位？", "How often do you leave your seat in meetings or other situations in which you are expected to remain seated?", asrsFreq),
+            q("你会多常觉得静不下来或烦躁不安？", "How often do you feel restless or fidgety?", asrsFreq),
+            q("当有自己独处的时间时，你会多常有觉得困难使自己平静和放松？", "How often do you have difficulty unwinding and relaxing when you have time to yourself?", asrsFreq),
+            q("你会多常像被马达所驱动一样，觉得自己过度地活跃，不得不做事？", "How often do you feel overly active and compelled to do things, like you were driven by a motor?", asrsFreq),
+            q("在社交场合中，你会多常发现自己话讲得太多？", "How often do you find yourself talking too much when you are in social situations?", asrsFreq),
+            q("当与他人交谈时，你会多常在别人还没把话讲完前就插嘴或接话替对方把话讲完？", "When you're in a conversation, how often do you find yourself finishing the sentences of the people you are talking to, before they can finish them themselves?", asrsFreq),
+            q("在需要轮流排队的场合时，你会多常有困难轮流等待？", "How often do you have difficulty waiting your turn in situations when turn taking is required?", asrsFreq),
+            q("你会多常在别人忙碌时打断别人？", "How often do you interrupt others when they are busy?", asrsFreq),
         ),
         bands = listOf(
-            b(0, 18, "below", "未达到常见症状阈值", "Below common symptom threshold", "两个维度都没有达到「任一维度 4 项及以上」的常见阈值。如果仍然困扰你，可以和医生讨论。", "Neither domain reached the common threshold of 4 or more symptoms. If it still troubles you, discuss it with a doctor."),
-            b(0, 18, "adhd_i", "可能为注意力缺陷为主型（ADHD-I）", "Possible predominantly inattentive presentation (ADHD-I)", "注意力不集中维度达到 4 项及以上，冲动/多动维度未达到。建议由专业人员进一步评估；这不是诊断。", "The inattention domain reached 4 or more symptoms while hyperactivity-impulsivity did not. Further professional assessment is suggested; this is not a diagnosis."),
-            b(0, 18, "adhd_h", "可能为多动/冲动为主型（ADHD-H）", "Possible predominantly hyperactive-impulsive presentation (ADHD-H)", "冲动/多动维度达到 4 项及以上，注意力维度未达到。建议由专业人员进一步评估；这不是诊断。", "The hyperactivity-impulsivity domain reached 4 or more symptoms while inattention did not. Further professional assessment is suggested; this is not a diagnosis."),
-            b(0, 18, "adhd_c", "可能为混合型（ADHD-C）", "Possible combined presentation (ADHD-C)", "两个维度都达到 4 项及以上。建议由专业人员进一步评估；ADHD 诊断还需要功能受损与儿童期起病信息。", "Both domains reached 4 or more symptoms. Further professional assessment is suggested; ADHD diagnosis also needs impairment and childhood onset."),
+            b(0, 16, "unlikely", "不太可能达到 ADHD 筛查标准", "Unlikely", "A、B 两部分的分数都低于 17 分。如果仍然困扰你，可以把具体困难告诉医生或专业人员。", "Both Part A and Part B scored below 17. If these difficulties still trouble you, discuss them with a doctor or professional."),
+            b(17, 23, "likely", "可能有 ADHD 症状", "Likely", "较高的一部分达到 17–23 分，症状可能与 ADHD 一致。建议由专业人员进一步评估；这不是诊断。", "The higher part scored 17–23, suggesting symptoms consistent with ADHD. Further professional assessment is suggested; this is not a diagnosis."),
+            b(24, 36, "very_likely", "非常可能有 ADHD 症状", "Very likely", "较高的一部分达到 24 分及以上，症状与 ADHD 高度一致。建议尽快由专业人员评估，并同时了解儿童期起病与功能受损情况。", "The higher part scored 24 or above, suggesting symptoms highly consistent with ADHD. Seek professional assessment soon, including childhood onset and impairment."),
+            // 旧版「计数法」记录的历史展示，不再用于新的测评
+            b(0, 18, "below", "旧版计分：未达到计数阈值", "Legacy scoring: below threshold", "这是旧版 ASRS-18 的计数结果，仅作历史参考；请使用新版重新测评。", "This is a legacy count-based ASRS-18 result for historical reference only; retake the updated version."),
+            b(0, 18, "adhd_i", "旧版计分：注意力为主型", "Legacy scoring: inattentive", "这是旧版 ASRS-18 的计数结果，仅作历史参考；新版不再给出亚型结论。", "This is a legacy count-based ASRS-18 result; the updated version no longer classifies subtypes."),
+            b(0, 18, "adhd_h", "旧版计分：多动/冲动为主型", "Legacy scoring: hyperactive-impulsive", "这是旧版 ASRS-18 的计数结果，仅作历史参考；新版不再给出亚型结论。", "This is a legacy count-based ASRS-18 result; the updated version no longer classifies subtypes."),
+            b(0, 18, "adhd_c", "旧版计分：混合型", "Legacy scoring: combined", "这是旧版 ASRS-18 的计数结果，仅作历史参考；新版不再给出亚型结论。", "This is a legacy count-based ASRS-18 result; the updated version no longer classifies subtypes.")
         ),
         scoring = ScaleScoring.ASRS18,
-        maxScoreOverride = 18,
-        estimatedMinutes = 4,
+        maxScoreOverride = 36,
+        estimatedMinutes = 5,
         featured = false,
-        source = "ASRS v1.1: Kessler et al. (2005) / World Health Organization。可免费用于临床与研究，请保留来源。",
-        sourceEn = "ASRS v1.1: Kessler et al. (2005) / World Health Organization. Free for clinical and research use with attribution.",
-        note = "得分只统计「经常 / 非常频繁」的条目；不能单独作为 ADHD 诊断，需结合功能受损与儿童期起病等信息。",
-        noteEn = "Only often or very often items count; this alone cannot diagnose ADHD and must be combined with impairment and childhood onset."
+        source = "ASRS v1.1 症状清单：Kessler et al. (2005) / World Health Organization；中文版参考 ZI/Harvard 公开的台湾繁体版。可免费用于临床与研究，请保留来源。",
+        sourceEn = "ASRS v1.1 Symptom Checklist: Kessler et al. (2005) / World Health Organization; Chinese wording follows the publicly available Taiwan traditional-Chinese form. Free for clinical and research use with attribution.",
+        note = "A、B 两部分各 9 题、各 0–36 分；0–16 不太可能，17–23 很可能，24 及以上非常可能。ASRS 不能单独诊断 ADHD，也不用于判断亚型，需结合儿童期起病、功能受损与临床访谈。",
+        noteEn = "Part A and Part B each have 9 items and 0–36 points; 0–16 unlikely, 17–23 likely, 24 or above very likely. The ASRS cannot diagnose ADHD alone or determine a subtype; combine it with childhood onset, impairment and a clinical interview."
     )
 
     val all: List<ScaleDef> = listOf(
@@ -2053,7 +2824,17 @@ object ScaleCatalog {
         pgsi,
         crafft,
         des2,
-        asq
+        asq,
+        bsl23,
+        iesr,
+        spin,
+        cssrs,
+        pq16,
+        ess,
+        mspss,
+        ffmq39,
+        ders36,
+        shaps
     )
 
     val featured: List<ScaleDef> = all.filter { it.featured }

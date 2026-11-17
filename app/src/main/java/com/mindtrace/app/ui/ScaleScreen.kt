@@ -128,6 +128,18 @@ fun ScaleScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        if (index == def.supplementStartIndex) {
+                            item {
+                                InfoBanner(
+                                    text = if (english) {
+                                        "The following items ask about behaviours over the past week. They are additional information and are not included in the total score."
+                                    } else {
+                                        "接下来的题目询问过去一周的行为。它们只作为补充信息，不计入总分。"
+                                    },
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
                         item {
                             SoftCard {
                                 Text(
@@ -177,7 +189,7 @@ fun ScaleScreen(
                                 }
                             }
                         }
-                        if (index == (def.selfHarmQuestionIndex ?: -1) && currentAnswer > 0) {
+                        if (index in def.effectiveRiskQuestionIndices && currentAnswer > 0) {
                             item {
                                 InfoBanner(
                                     text = "这道题的回答让人担心。如果你正在经历伤害自己的念头，请现在就联系信任的人、心理援助热线 12356，或打开紧急支持。",
@@ -251,7 +263,9 @@ private fun ResultContent(
     val def = ScaleCatalog.byType(defType)
     val band = def?.band(result.severity)
     val answers = result.answers.split(',').mapNotNull { it.toIntOrNull() }
-    val selfHarm = def?.selfHarmQuestionIndex?.let { idx -> answers.getOrNull(idx) } ?: 0
+    val riskQuestion = def?.effectiveRiskQuestionIndices?.firstOrNull { idx ->
+        (answers.getOrNull(idx) ?: 0) > 0
+    }
     val detail = def?.detail(answers, english)
     val source = def?.sourceFor(english).orEmpty()
     val note = def?.noteFor(english).orEmpty()
@@ -267,20 +281,20 @@ private fun ResultContent(
             SoftCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     if (defType == "ASRS18") {
-                        val inattention = (0..8).count { (answers.getOrNull(it) ?: 0) >= 3 }
-                        val hyperactivity = (9..17).count { (answers.getOrNull(it) ?: 0) >= 3 }
+                        val inattention = (0..8).sumOf { answers.getOrNull(it) ?: 0 }
+                        val hyperactivity = (9..17).sumOf { answers.getOrNull(it) ?: 0 }
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    if (english) "Inattention" else "注意力不集中",
+                                    if (english) "Part A · Inattention" else "A 部分 · 注意力不集中",
                                     style = MaterialTheme.typography.bodyLarge,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    "$inattention / 9",
+                                    "$inattention / 36",
                                     style = MaterialTheme.typography.headlineMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -291,20 +305,20 @@ private fun ResultContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    if (english) "Hyperactivity / impulsivity" else "冲动 / 多动",
+                                    if (english) "Part B · Hyperactivity / impulsivity" else "B 部分 · 冲动 / 多动",
                                     style = MaterialTheme.typography.bodyLarge,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    "$hyperactivity / 9",
+                                    "$hyperactivity / 36",
                                     style = MaterialTheme.typography.headlineMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
                             Spacer(Modifier.height(10.dp))
                             Text(
-                                if (english) "Each domain out of 9 · only often / very often count"
-                                else "每个维度满分 9 · 只计「经常 / 非常频繁」",
+                                if (english) "Each part 0–36 · 0–16 unlikely · 17–23 likely · 24+ very likely"
+                                else "每部分 0–36 分 · 0–16 不太可能 · 17–23 很可能 · 24+ 非常可能",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -312,12 +326,12 @@ private fun ResultContent(
 
                     } else {
                         Text(
-                            "${result.score}",
+                            def?.formatScore(result.score) ?: "${result.score}",
                             style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Normal),
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            if (english) "Out of ${def?.maxScore ?: "?"}" else "满分 ${def?.maxScore ?: "?"}",
+                            if (english) "Out of ${def?.formatMaxScore() ?: "?"}" else "满分 ${def?.formatMaxScore() ?: "?"}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -355,7 +369,7 @@ private fun ResultContent(
                 }
             }
         }
-        if (selfHarm > 0) {
+        if (riskQuestion != null) {
             item {
                 SoftCard(containerColor = MaterialTheme.colorScheme.errorContainer) {
                     Row(verticalAlignment = Alignment.Top) {
@@ -370,9 +384,9 @@ private fun ResultContent(
                             Text("你不需要独自面对", style = MaterialTheme.typography.titleSmall)
                             Text(
                                 if (english) {
-                                    "Your answer to question ${(def?.selfHarmQuestionIndex ?: 0) + 1} suggests you may be having thoughts of harming yourself. Tell someone you trust, or contact 12356 / 120 / 110."
+                                    "Your answer to question ${riskQuestion + 1} suggests you may be having thoughts of harming yourself. Tell someone you trust, or contact 12356 / 120 / 110."
                                 } else {
-                                    "第 ${(def?.selfHarmQuestionIndex ?: 0) + 1} 题的回答提示你可能正在经历伤害自己的念头。请告诉信任的人，或联系 12356 / 120 / 110。"
+                                    "第 ${riskQuestion + 1} 题的回答提示你可能正在经历伤害自己的念头。请告诉信任的人，或联系 12356 / 120 / 110。"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
