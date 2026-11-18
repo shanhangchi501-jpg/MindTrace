@@ -150,9 +150,12 @@ data class ScaleDef(
         }
         ScaleScoring.DASS21 -> severityDass21(answers)
         ScaleScoring.ASRS18 -> {
+            val inattention = (0..8).sumOf { index -> optionValue(index, answers.getOrElse(index) { 0 }) }
+            val hyperactivity = (9..17).sumOf { index -> optionValue(index, answers.getOrElse(index) { 0 }) }
             val key = when {
-                score(answers) >= 24 -> "very_likely"
-                score(answers) >= 17 -> "likely"
+                inattention >= 17 && hyperactivity >= 17 -> "adhd_c"
+                inattention >= 17 -> "adhd_i"
+                hyperactivity >= 17 -> "adhd_h"
                 else -> "unlikely"
             }
             bands.firstOrNull { it.key == key } ?: bands.last()
@@ -2772,9 +2775,9 @@ object ScaleCatalog {
             b(24, 36, "very_likely", "非常可能有 ADHD 症状", "Very likely", "较高的一部分达到 24 分及以上，症状与 ADHD 高度一致。建议尽快由专业人员评估，并同时了解儿童期起病与功能受损情况。", "The higher part scored 24 or above, suggesting symptoms highly consistent with ADHD. Seek professional assessment soon, including childhood onset and impairment."),
             // 旧版「计数法」记录的历史展示，不再用于新的测评
             b(0, 18, "below", "旧版计分：未达到计数阈值", "Legacy scoring: below threshold", "这是旧版 ASRS-18 的计数结果，仅作历史参考；请使用新版重新测评。", "This is a legacy count-based ASRS-18 result for historical reference only; retake the updated version."),
-            b(0, 18, "adhd_i", "旧版计分：注意力为主型", "Legacy scoring: inattentive", "这是旧版 ASRS-18 的计数结果，仅作历史参考；新版不再给出亚型结论。", "This is a legacy count-based ASRS-18 result; the updated version no longer classifies subtypes."),
-            b(0, 18, "adhd_h", "旧版计分：多动/冲动为主型", "Legacy scoring: hyperactive-impulsive", "这是旧版 ASRS-18 的计数结果，仅作历史参考；新版不再给出亚型结论。", "This is a legacy count-based ASRS-18 result; the updated version no longer classifies subtypes."),
-            b(0, 18, "adhd_c", "旧版计分：混合型", "Legacy scoring: combined", "这是旧版 ASRS-18 的计数结果，仅作历史参考；新版不再给出亚型结论。", "This is a legacy count-based ASRS-18 result; the updated version no longer classifies subtypes.")
+            b(0, 36, "adhd_i", "可能患有 ADHD-I（注意力缺陷为主型）", "Possible ADHD-I (predominantly inattentive)", "A 部分达到 17 分及以上、B 部分低于 17 分，提示可能为注意力缺陷为主型。建议由专业人员进一步评估；这不是诊断。", "Part A scored 17 or above while Part B was below 17, suggesting the predominantly inattentive presentation. Further professional assessment is suggested; this is not a diagnosis."),
+            b(0, 36, "adhd_h", "可能患有 ADHD-H（多动/冲动为主型）", "Possible ADHD-H (predominantly hyperactive-impulsive)", "B 部分达到 17 分及以上、A 部分低于 17 分，提示可能为多动/冲动为主型。建议由专业人员进一步评估；这不是诊断。", "Part B scored 17 or above while Part A was below 17, suggesting the predominantly hyperactive-impulsive presentation. Further professional assessment is suggested; this is not a diagnosis."),
+            b(0, 36, "adhd_c", "可能患有 ADHD-C（混合型）", "Possible ADHD-C (combined)", "A、B 两部分都达到 17 分及以上，提示可能为混合型。建议由专业人员进一步评估；这不是诊断。", "Both Part A and Part B scored 17 or above, suggesting the combined presentation. Further professional assessment is suggested; this is not a diagnosis.")
         ),
         scoring = ScaleScoring.ASRS18,
         maxScoreOverride = 36,
@@ -2782,8 +2785,8 @@ object ScaleCatalog {
         featured = false,
         source = "ASRS v1.1 症状清单：Kessler et al. (2005) / World Health Organization；中文版参考 ZI/Harvard 公开的台湾繁体版。可免费用于临床与研究，请保留来源。",
         sourceEn = "ASRS v1.1 Symptom Checklist: Kessler et al. (2005) / World Health Organization; Chinese wording follows the publicly available Taiwan traditional-Chinese form. Free for clinical and research use with attribution.",
-        note = "A、B 两部分各 9 题、各 0–36 分；0–16 不太可能，17–23 很可能，24 及以上非常可能。ASRS 不能单独诊断 ADHD，也不用于判断亚型，需结合儿童期起病、功能受损与临床访谈。",
-        noteEn = "Part A and Part B each have 9 items and 0–36 points; 0–16 unlikely, 17–23 likely, 24 or above very likely. The ASRS cannot diagnose ADHD alone or determine a subtype; combine it with childhood onset, impairment and a clinical interview."
+        note = "A、B 两部分各 9 题、各 0–36 分，单部分 0–16 不太可能、17–23 很可能、24+ 非常可能；两部分都 ≥17 提示混合型，仅一部分 ≥17 提示对应亚型。亚型只是筛查提示，确诊需结合儿童期起病、功能受损与临床访谈。",
+        noteEn = "Part A and Part B each have 9 items and 0–36 points; 0–16 unlikely, 17–23 likely, 24 or above very likely within a part. Both parts 17 or above suggest the combined presentation, while only one part 17+ suggests that subtype. Subtype is a screening hint only; diagnosis needs childhood onset, impairment and a clinical interview."
     )
 
     val all: List<ScaleDef> = listOf(

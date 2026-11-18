@@ -4,7 +4,7 @@
 
 它不是诊断工具，也不替代医生。它只做一件事：帮你把每天的起伏留下来，并在复诊时整理成医生容易阅读的报告。
 
-**当前版本：0.4.11（正式签名版）** · [发布说明](RELEASE_NOTES.md) · [变更记录](CHANGELOG.md)
+**当前版本：0.4.12（正式签名版）** · [发布说明](RELEASE_NOTES.md) · [变更记录](CHANGELOG.md)
 
 ## 截图
 
@@ -28,7 +28,7 @@
 | --- | --- | --- |
 | ![深色趋势](docs/screenshots/13-trends-dark.png) | ![PDF 1](docs/screenshots/14-pdf-page1.png) | ![PDF 2](docs/screenshots/15-pdf-page2.png) |
 
-## 已实现（0.4.11 正式版）
+## 已实现（0.4.12 正式版）
 
 - 首次引导：医疗免责声明、病种/症状选择、提醒设置、可选应用锁
 - **5 个底部标签**：今天、药物、趋势、科普、我的；页面常驻组合，切换无闪烁且保留滚动位置
@@ -130,7 +130,7 @@ APK、示例 PDF、测试数据集与 SHA-256 见 [GitHub Releases](https://gith
 
 最新版本：[v0.4.1](https://github.com/shanhangchi501-jpg/MindTrace/releases/tag/v0.4.1)
 
-0.4.11 Release APK SHA-256：`0d2fda8112cb409993bddca6cd74ab0d577beef64e61148b4ad0e8471a9ce6bc`
+0.4.12 Release APK SHA-256：`e57129c8242219ed1454ba059de40fc801956a69daf4cd753ffe12edf4bc5758`
 
 ### 宣传 / 演示素材
 
@@ -165,7 +165,7 @@ app/src/main/java/com/mindtrace/app/
 
 ## 测试
 
-当前版本为 `0.4.1`，为正式签名版本。测试清单见 [TESTING.md](TESTING.md)，安装与使用说明见 [USER_GUIDE.md](USER_GUIDE.md)。
+当前版本为 `0.4.12`，为正式签名版本。测试清单见 [TESTING.md](TESTING.md)，安装与使用说明见 [USER_GUIDE.md](USER_GUIDE.md)。
 
 提醒功能声明了 `USE_EXACT_ALARM`（Android 13+ 自动授予），以保证每日记录和用药提醒准时触发。如果未来上架 Google Play，需要重新评估该权限的政策适用性；侧载版本不受此限制。
 

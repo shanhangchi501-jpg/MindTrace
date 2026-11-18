@@ -317,8 +317,8 @@ private fun ResultContent(
                             }
                             Spacer(Modifier.height(10.dp))
                             Text(
-                                if (english) "Each part 0–36 · 0–16 unlikely · 17–23 likely · 24+ very likely"
-                                else "每部分 0–36 分 · 0–16 不太可能 · 17–23 很可能 · 24+ 非常可能",
+                                if (english) "Each part 0–36 · both parts 17+ suggests ADHD-C, one part 17+ suggests ADHD-I / ADHD-H"
+                                else "每部分 0–36 分 · 两部分都 ≥17 提示混合型，仅一部分 ≥17 提示注意力型或多动冲动型",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

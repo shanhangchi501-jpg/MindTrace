@@ -138,12 +138,15 @@ class ScaleCatalogTest {
         val partALikely = MutableList(18) { 0 }
         for (i in 0..8) partALikely[i] = 2
         assertEquals(18, asrs.score(partALikely))
-        assertEquals("likely", asrs.severity(partALikely).key)
+        assertEquals("adhd_i", asrs.severity(partALikely).key)
 
         val partBVeryLikely = MutableList(18) { 0 }
         for (i in 9..17) partBVeryLikely[i] = 3
         assertEquals(27, asrs.score(partBVeryLikely))
-        assertEquals("very_likely", asrs.severity(partBVeryLikely).key)
+        assertEquals("adhd_h", asrs.severity(partBVeryLikely).key)
+
+        val bothLikely = MutableList(18) { 2 }
+        assertEquals("adhd_c", asrs.severity(bothLikely).key)
 
         val detail = asrs.detail(partALikely, true)!!
         assertTrue(detail.contains("Part A (inattention) 18 / 36"))
